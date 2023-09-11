@@ -58,7 +58,7 @@ export class StaneksGift extends BaseGift {
     this.storedCycles = Math.max(0, this.storedCycles - usedCycles);
     // Only update multipliers (slow) if there was charging done since last process tick.
     if (this.justCharged) {
-      this.updateMults();
+      Player.applyEntropy(Player.entropy);
       this.justCharged = false;
     }
     StaneksGiftEvents.emit();
@@ -139,7 +139,6 @@ export class StaneksGift extends BaseGift {
     const mults = defaultMultipliers();
     for (const aFrag of this.fragments) {
       const fragment = aFrag.fragment();
-
       const power = this.effect(aFrag);
       switch (fragment.type) {
         case FragmentType.HackingChance:
@@ -212,7 +211,6 @@ export class StaneksGift extends BaseGift {
   updateMults(): void {
     // applyEntropy also reapplies all augmentations and source files
     // This wraps up the reset nicely
-    Player.applyEntropy(Player.entropy);
     const mults = this.calculateMults();
     Player.mults = mergeMultipliers(Player.mults, mults);
     Player.updateSkillLevels();
