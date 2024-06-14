@@ -8770,6 +8770,7 @@ interface AutocompleteData {
   servers: string[];
   scripts: string[];
   txts: string[];
+  enums: NSEnums;
   flags(schema: [string, string | number | boolean | string[]][]): { [key: string]: ScriptArg | string[] };
 }
 
