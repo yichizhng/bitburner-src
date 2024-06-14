@@ -657,8 +657,8 @@ export const FactionInfos: Record<FactionName, FactionInfo> = {
 
   // Early game factions - factions the player will prestige with early on that don't belong in other categories.
   [FactionName.Netburners]: new FactionInfo({
-    infoText: <>{"~~//*>H4CK|\\|3T 8URN3R5**>?>\\~~"}</>,
-    rumorText: <>{"~~//*>H4CK|\\|3T 8URN3R5**>?>\\~~"}</>,
+    infoText: <>{"~~//*>H4CK|\\|3T 8URN3R5**>?>\\\\~~"}</>,
+    rumorText: <>{"~~//*>H4CK|\\|3T 8URN3R5**>?>\\\\~~"}</>,
     inviteReqs: [haveSkill("hacking", 80), totalHacknetRam(8), totalHacknetCores(4), totalHacknetLevels(100)],
     rumorReqs: [totalHacknetLevels(50)],
     offerHackingWork: true,
