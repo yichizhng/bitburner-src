@@ -3144,9 +3144,10 @@ export interface Bladeburner {
    *
    * @param type - Type of action.
    * @param name - Name of action. Must be an exact match.
+   * @param sleeve - Optional.  Sleeve number to check for success.
    * @returns Estimated success chance for the specified action.
    */
-  getActionEstimatedSuccessChance(type: string, name: string): [number, number];
+  getActionEstimatedSuccessChance(type: string, name: string, sleeve?: number): [number, number];
 
   /**
    * Get the reputation gain of an action.
