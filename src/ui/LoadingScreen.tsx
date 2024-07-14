@@ -11,6 +11,7 @@ import { CONSTANTS } from "../Constants";
 import { ActivateRecoveryMode } from "./React/RecoveryRoot";
 import { hash } from "../hash/hash";
 import { pushGameReady } from "../Electron";
+import initSwc from "@swc/wasm-web";
 
 export function LoadingScreen(): React.ReactElement {
   const [show, setShow] = useState(false);
@@ -33,6 +34,7 @@ export function LoadingScreen(): React.ReactElement {
   useEffect(() => {
     load().then(async (saveData) => {
       try {
+        await initSwc();
         await Engine.load(saveData);
       } catch (error) {
         console.error(error);

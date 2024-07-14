@@ -71,6 +71,18 @@ export class ScriptEditor {
       languageDefaults.addExtraLib(reactTypes, "react.d.ts");
       languageDefaults.addExtraLib(reactDomTypes, "react-dom.d.ts");
     }
+    monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+      ...monaco.languages.typescript.typescriptDefaults.getCompilerOptions(),
+      jsx: monaco.languages.typescript.JsxEmit.ReactJSX,
+      allowUmdGlobalAccess: true,
+    });
+    /**
+     * Ignore these errors in the editor:
+     * - Cannot find module ''. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?(2792)
+     */
+    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+      diagnosticCodesToIgnore: [2792],
+    });
     monaco.languages.json.jsonDefaults.setModeConfiguration({
       ...monaco.languages.json.jsonDefaults.modeConfiguration,
       //completion should be disabled because the

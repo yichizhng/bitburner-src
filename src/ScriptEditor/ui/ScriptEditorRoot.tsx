@@ -30,6 +30,9 @@ import { NoOpenScripts } from "./NoOpenScripts";
 import { ScriptEditorContextProvider, useScriptEditorContext } from "./ScriptEditorContext";
 import { useVimEditor } from "./useVimEditor";
 import { useCallback } from "react";
+import { type AST, getFileType, parseAST } from "../../utils/ScriptTransformer";
+import { RamCalculationErrorCode } from "../../Script/RamCalculationErrorCodes";
+import { hasScriptExtension, isLegacyScript } from "../../Paths/ScriptFilePath";
 
 interface IProps {
   // Map of filename -> code
@@ -44,7 +47,7 @@ function Root(props: IProps): React.ReactElement {
   const rerender = useRerender();
   const editorRef = useRef<IStandaloneCodeEditor | null>(null);
 
-  const { updateRAM, startUpdatingRAM, finishUpdatingRAM } = useScriptEditorContext();
+  const { showRAMError, updateRAM, startUpdatingRAM, finishUpdatingRAM } = useScriptEditorContext();
 
   let decorations: monaco.editor.IEditorDecorationsCollection | undefined;
 
@@ -112,11 +115,14 @@ function Root(props: IProps): React.ReactElement {
     return () => document.removeEventListener("keydown", keydown);
   }, [save]);
 
-  function infLoop(newCode: string): void {
-    if (editorRef.current === null || currentScript === null) return;
-    if (!decorations) decorations = editorRef.current.createDecorationsCollection();
-    if (!currentScript.path.endsWith(".js")) return;
-    const possibleLines = checkInfiniteLoop(newCode);
+  function infLoop(ast: AST, code: string): void {
+    if (editorRef.current === null || currentScript === null || isLegacyScript(currentScript.path)) {
+      return;
+    }
+    if (!decorations) {
+      decorations = editorRef.current.createDecorationsCollection();
+    }
+    const possibleLines = checkInfiniteLoop(ast, code);
     if (possibleLines.length !== 0) {
       decorations.set(
         possibleLines.map((awaitWarning) => ({
@@ -131,21 +137,34 @@ function Root(props: IProps): React.ReactElement {
             glyphMarginClassName: "myGlyphMarginClass",
             glyphMarginHoverMessage: {
               value:
-                "Possible infinite loop, await something. If this is a false-positive, use `// @ignore-infinite` to suppress.",
+                "Possible infinite loop, await something. If this is a false positive, use `// @ignore-infinite` to suppress.",
             },
           },
         })),
       );
-    } else decorations.clear();
+    } else {
+      decorations.clear();
+    }
   }
 
   const debouncedCodeParsing = debounce((newCode: string) => {
-    infLoop(newCode);
-    updateRAM(
-      !currentScript || currentScript.isTxt ? null : newCode,
-      currentScript && currentScript.path,
-      currentScript && GetServer(currentScript.hostname),
-    );
+    let server;
+    if (!currentScript || !hasScriptExtension(currentScript.path) || !(server = GetServer(currentScript.hostname))) {
+      showRAMError();
+      return;
+    }
+    let ast;
+    try {
+      ast = parseAST(newCode, getFileType(currentScript.path));
+    } catch (error) {
+      showRAMError({
+        errorCode: RamCalculationErrorCode.SyntaxError,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+    infLoop(ast, newCode);
+    updateRAM(ast, currentScript.path, server);
     finishUpdatingRAM();
   }, 300);
 

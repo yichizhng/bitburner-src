@@ -192,5 +192,11 @@ module.exports = (env, argv) => {
       fallback: { crypto: false },
     },
     stats: statsConfig,
+    ignoreWarnings: [
+      {
+        module: /@babel\/standalone/,
+        message: /Critical dependency: the request of a dependency is an expression/,
+      },
+    ],
   };
 };
