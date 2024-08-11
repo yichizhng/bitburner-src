@@ -758,7 +758,7 @@ async function loadGame(saveData: SaveData): Promise<boolean> {
   if (Object.hasOwn(saveObj, "StaneksGiftSave")) {
     loadStaneksGift(saveObj.StaneksGiftSave);
   } else {
-    console.warn(`Could not load Staneks Gift from save`);
+    console.warn(`Could not load Stanek's Gift from save`);
     loadStaneksGift("");
   }
   if (Object.hasOwn(saveObj, "AliasesSave")) {
