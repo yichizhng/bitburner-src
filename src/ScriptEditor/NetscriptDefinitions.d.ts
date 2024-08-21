@@ -5231,7 +5231,7 @@ interface HacknetServersFormulas {
    * @param level - level of the upgrade
    * @returns The calculated hash cost.
    */
-  hashUpgradeCost(upgName: number, level: number): number;
+  hashUpgradeCost(upgName: string, level: number): number;
   /**
    * Calculate the cost of a hacknet server.
    * @param n - number of the hacknet server
