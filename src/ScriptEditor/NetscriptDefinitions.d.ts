@@ -7125,7 +7125,7 @@ export interface NS {
   /**
    * Returns an array with the hostnames of all of the servers you have purchased.
    *
-   * @remarks 2.25 GB
+   * @remarks 1.05 GB
    * @returns Returns an array with the hostnames of all of the servers you have purchased.
    */
   getPurchasedServers(): string[];

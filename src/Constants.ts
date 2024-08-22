@@ -123,7 +123,7 @@ export const CONSTANTS = {
 - Fix misleading favor numbers (@catloversg)
 - Sync UI updates to game updates. (@tom.prince)
 - Always show description of faction price multiplier (@catloversg)
-- Add apostrophe to stanek's gift strings (@nicole)
+- Add apostrophe to stanek's gift strings (@faenre)
 - Use Autocomplete instead of Select in augmentation tool (@catloversg)
 - Notify players about documentation tab after getting SF1.1 (@catloversg)
 
