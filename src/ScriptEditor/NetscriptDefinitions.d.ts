@@ -3175,7 +3175,7 @@ export interface Bladeburner {
   /**
    * List all contracts.
    * @remarks
-   * RAM cost: 0.4 GB
+   * RAM cost: 0 GB
    *
    * Returns an array of strings containing the names of all Bladeburner contracts.
    *
@@ -3186,7 +3186,7 @@ export interface Bladeburner {
   /**
    * List all operations.
    * @remarks
-   * RAM cost: 0.4 GB
+   * RAM cost: 0 GB
    *
    * Returns an array of strings containing the names of all Bladeburner operations.
    *
@@ -3197,7 +3197,7 @@ export interface Bladeburner {
   /**
    * List all black ops.
    * @remarks
-   * RAM cost: 0.4 GB
+   * RAM cost: 0 GB
    *
    * Returns an array of strings containing the names of all Bladeburner Black Ops.
    *
@@ -3220,7 +3220,7 @@ export interface Bladeburner {
   /**
    * List all general actions.
    * @remarks
-   * RAM cost: 0.4 GB
+   * RAM cost: 0 GB
    *
    * Returns an array of strings containing the names of all general Bladeburner actions.
    *
@@ -3231,7 +3231,7 @@ export interface Bladeburner {
   /**
    * List all skills.
    * @remarks
-   * RAM cost: 0.4 GB
+   * RAM cost: 0 GB
    *
    * Returns an array of strings containing the names of all general Bladeburner skills.
    *
@@ -3851,7 +3851,7 @@ export interface CodingContract {
   /**
    * List all contract types.
    * @remarks
-   * RAM cost: 2 GB
+   * RAM cost: 0 GB
    */
   getContractTypes(): string[];
 }
@@ -3996,7 +3996,7 @@ export interface Gang {
   /**
    * List member task names.
    * @remarks
-   * RAM cost: 1 GB
+   * RAM cost: 0 GB
    *
    * Get the name of all valid tasks that Gang members can be assigned to.
    *
@@ -4033,7 +4033,7 @@ export interface Gang {
   /**
    * List equipment names.
    * @remarks
-   * RAM cost: 1 GB
+   * RAM cost: 0 GB
    *
    * Get the name of all possible equipment/upgrades you can purchase for your Gang Members.
    * This includes Augmentations.
@@ -5503,7 +5503,7 @@ interface Infiltration {
   /**
    * Get all locations that can be infiltrated.
    * @remarks
-   * RAM cost: 5 GB
+   * RAM cost: 0 GB
    *
    * @returns all locations that can be infiltrated.
    */
