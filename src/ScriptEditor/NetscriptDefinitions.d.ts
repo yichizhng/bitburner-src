@@ -653,22 +653,22 @@ interface BitNodeMultipliers {
   CharismaLevelMultiplier: number;
   /** Influences the experience gained for each ability when a player completes a class. */
   ClassGymExpGain: number;
-  /** Influences the amount of money gained from completing Coding Contracts */
+  /**Influences the amount of money gained from completing Coding Contracts. */
   CodingContractMoney: number;
   /** Influences the experience gained for each ability when the player completes working their job. */
   CompanyWorkExpGain: number;
   /** Influences how much money the player earns when completing working their job. */
   CompanyWorkMoney: number;
-  /** Influences the amount of divisions a corporation can have at the same time*/
-  CorporationDivisions: number;
-  /** Influences the money gain from dividends of corporations created by the player. */
-  CorporationSoftcap: number;
+  /** Influences how much rep the player gains when performing work for a company. */
+  CompanyWorkRepGain: number;
   /** Influences the valuation of corporations created by the player. */
   CorporationValuation: number;
   /** Influences the base experience gained for each ability when the player commits a crime. */
   CrimeExpGain: number;
   /** Influences the base money gained when the player commits a crime. */
   CrimeMoney: number;
+  /** influences the success chance of committing crimes */
+  CrimeSuccessRate: number;
   /** Influences how many Augmentations you need in order to get invited to the Daedalus faction */
   DaedalusAugsRequirement: number;
   /** Influences how quickly the player's defense level (not exp) scales */
@@ -685,14 +685,22 @@ interface BitNodeMultipliers {
   FourSigmaMarketDataApiCost: number;
   /** Influences how much it costs to unlock the stock market's 4S Market Data (NOT API) */
   FourSigmaMarketDataCost: number;
-  /** Influences the respect gain and money gain of your gang. */
+  /** Reduces gangs earning. */
   GangSoftcap: number;
+  /** Percentage of unique augs that the gang has. */
+  GangUniqueAugs: number;
+  /** Percentage multiplier on the effect of the IPvGO rewards  **/
+  GoPower: number;
   /** Influences the experienced gained when hacking a server. */
   HackExpGain: number;
   /** Influences how quickly the player's hacking level (not experience) scales */
   HackingLevelMultiplier: number;
-  /** Influences how much money is produced by Hacknet Nodes
-   *  and the hash rate of Hacknet Servers (unlocked in BitNode-9) */
+  /** Influences how quickly the player's hack(), grow() and weaken() calls run */
+  HackingSpeedMultiplier: number;
+  /**
+   * Influences how much money is produced by Hacknet Nodes.
+   * Influences the hash rate of Hacknet Servers (unlocked in BitNode-9)
+   */
   HacknetNodeMoney: number;
   /** Influences how much money it costs to upgrade your home computer's RAM */
   HomeComputerRamCost: number;
@@ -700,22 +708,28 @@ interface BitNodeMultipliers {
   InfiltrationMoney: number;
   /** Influences how much rep the player can gain from factions when selling stolen documents and secrets */
   InfiltrationRep: number;
-  /** Influences how much money can be stolen from a server when the player
-   *  performs a hack against it through the Terminal. */
+  /**
+   * Influences how much money can be stolen from a server when the player performs a hack against it through
+   * the Terminal.
+   */
   ManualHackMoney: number;
   /** Influence how much it costs to purchase a server */
   PurchasedServerCost: number;
+  /** Influence how much it costs to purchase a server */
+  PurchasedServerSoftcap: number;
   /** Influences the maximum number of purchased servers you can have */
   PurchasedServerLimit: number;
   /** Influences the maximum allowed RAM for a purchased server */
   PurchasedServerMaxRam: number;
-  /** Influences cost of any purchased server at or above 128GB */
-  PurchasedServerSoftcap: number;
   /** Influences the minimum favor the player must have with a faction before they can donate to gain rep. */
   RepToDonateToFaction: number;
-  /** Influences how much the money on a server can be reduced when a script performs a hack against it. */
+  /** Influences how much money can be stolen from a server when a script performs a hack against it. */
   ScriptHackMoney: number;
-  /** Influences how much of the money stolen by a scripted hack will be added to the player's money. */
+  /**
+   * The amount of money actually gained when script hack a server. This is
+   * different than the above because you can reduce the amount of money but
+   * not gain that same amount.
+   */
   ScriptHackMoneyGain: number;
   /** Influences the growth percentage per cycle against a server. */
   ServerGrowthRate: number;
@@ -729,12 +743,16 @@ interface BitNodeMultipliers {
   ServerWeakenRate: number;
   /** Influences how quickly the player's strength level (not exp) scales */
   StrengthLevelMultiplier: number;
-  /** Influences the power of the gift */
+  /** Influences the power of the gift. */
   StaneksGiftPowerMultiplier: number;
-  /** Influences the size of the gift */
+  /** Influences the size of the gift. */
   StaneksGiftExtraSize: number;
   /** Influences the hacking skill required to backdoor the world daemon. */
   WorldDaemonDifficulty: number;
+  /** Influences profits from corporation dividends and selling shares. */
+  CorporationSoftcap: number;
+  /** Influences the amount of divisions a corporation can have have at the same time*/
+  CorporationDivisions: number;
 }
 
 /**
