@@ -4,7 +4,7 @@ import { Player } from "@player";
 import { AugmentationName, GoColor, GoOpponent, GoPlayType, GoValidity } from "@enums";
 import { Go, GoEvents } from "../Go";
 import { getNewBoardState, makeMove, passTurn, updateCaptures, updateChains } from "../boardState/boardState";
-import { makeAIMove } from "../boardAnalysis/goAI";
+import { makeAIMove, resetAI } from "../boardAnalysis/goAI";
 import {
   evaluateIfMoveIsValid,
   getControlledSpace,
@@ -292,6 +292,7 @@ export function resetBoardState(
   }
 
   Go.currentGame = getNewBoardState(boardSize, opponent, true);
+  resetAI(false);
   GoEvents.emit(); // Trigger a Go UI rerender
   logger(`New game started: ${opponent}, ${boardSize}x${boardSize}`);
   return simpleBoardFromBoard(Go.currentGame.board);

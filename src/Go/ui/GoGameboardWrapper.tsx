@@ -18,7 +18,7 @@ import { GoScoreModal } from "./GoScoreModal";
 import { GoGameboard } from "./GoGameboard";
 import { GoSubnetSearch } from "./GoSubnetSearch";
 import { CorruptableText } from "../../ui/React/CorruptableText";
-import { makeAIMove, resolveCurrentTurn } from "../boardAnalysis/goAI";
+import { makeAIMove, resetAI, resolveCurrentTurn } from "../boardAnalysis/goAI";
 import { GoScoreExplanation } from "./GoScoreExplanation";
 
 interface GoGameboardWrapperProps {
@@ -144,6 +144,7 @@ export function GoGameboardWrapper({ showInstructions }: GoGameboardWrapperProps
     }
 
     Go.currentGame = getNewBoardState(newBoardSize, newOpponent, true);
+    resetAI(false);
     rerender();
     resolveCurrentTurn();
   }
