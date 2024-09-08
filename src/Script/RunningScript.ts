@@ -58,6 +58,9 @@ export class RunningScript {
   // Process ID. Must be an integer and equals the PID of corresponding WorkerScript
   pid = -1;
 
+  // Process ID of the parent process. 0 indicates no parent (such as run from terminal).
+  parent = 0;
+
   // How much RAM this script uses for ONE thread
   ramUsage: number = RamCostConstants.Base;
 
@@ -168,7 +171,7 @@ export class RunningScript {
   }
 }
 const includedProperties = getKeyList(RunningScript, {
-  removedKeys: ["logs", "dependencies", "logUpd", "pid", "tailProps"],
+  removedKeys: ["logs", "dependencies", "logUpd", "pid", "parent", "tailProps"],
 });
 const includedPropsNoTitle = includedProperties.filter((x) => x !== "title");
 

@@ -155,6 +155,7 @@ export async function main(ns) {
 |  [scp(files, destination, source)](./bitburner.ns.scp.md) | Copy file between servers. |
 |  [scriptKill(script, host)](./bitburner.ns.scriptkill.md) | Kill all scripts with a filename. |
 |  [scriptRunning(script, host)](./bitburner.ns.scriptrunning.md) | Check if any script with a filename is running. |
+|  [self()](./bitburner.ns.self.md) | Returns the currently running script. |
 |  [serverExists(host)](./bitburner.ns.serverexists.md) | Returns a boolean denoting whether or not the specified server exists. |
 |  [setTitle(title, pid)](./bitburner.ns.settitle.md) | Set the title of the tail window of a script. |
 |  [share()](./bitburner.ns.share.md) | Share the server's ram with your factions. |

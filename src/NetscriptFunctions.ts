@@ -776,6 +776,11 @@ export const ns: InternalAPI<NSFull> = {
         throw new ScriptDeath(ctx.workerScript);
       }
     },
+  self: (ctx) => () => {
+    const runningScript = helpers.getRunningScript(ctx, ctx.workerScript.pid);
+    if (runningScript == null) throw helpers.errorMessage(ctx, "Cannot find running script. This is a bug.");
+    return helpers.createPublicRunningScript(runningScript, ctx.workerScript);
+  },
   kill:
     (ctx) =>
     (scriptID, hostname = ctx.workerScript.hostname, ...scriptArgs) => {

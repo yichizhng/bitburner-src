@@ -484,6 +484,7 @@ export function runScriptFromScript(
     () => `'${scriptname}' on '${host.hostname}' with ${runOpts.threads} threads and args: ${arrayToString(args)}.`,
   );
   const runningScriptObj = new RunningScript(script, singleRamUsage, args);
+  runningScriptObj.parent = workerScript.pid;
   runningScriptObj.threads = runOpts.threads;
   runningScriptObj.temporary = runOpts.temporary;
 
