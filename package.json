@@ -74,6 +74,7 @@
     "@typescript-eslint/parser": "^6.9.1",
     "babel-jest": "^29.7.0",
     "babel-loader": "^9.1.3",
+    "babel-plugin-transform-barrels": "github:cmfrydos/babel-plugin-transform-barrels#46a8aa71cf67a544f7144b47d67f3027424e5cdb",
     "copy-webpack-plugin": "^12.0.2",
     "css-loader": "^6.8.1",
     "electron": "^29.4.5",
