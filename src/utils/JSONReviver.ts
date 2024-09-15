@@ -12,6 +12,7 @@ export interface IReviverValue<T = any> {
   ctor: string;
   data: T;
 }
+
 function isReviverValue(value: unknown): value is IReviverValue {
   return (
     typeof value === "object" && value !== null && "ctor" in value && typeof value.ctor === "string" && "data" in value

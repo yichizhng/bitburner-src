@@ -1,6 +1,6 @@
 import type { PromisePair } from "../Types/Promises";
 import type { BlackOperation, Contract, GeneralAction, Operation } from "./Actions";
-import type { ActionIdentifier, Action, Attempt } from "./Types";
+import type { Action, ActionIdFor, ActionIdentifier, Attempt } from "./Types";
 import type { Person } from "../PersonObjects/Person";
 import type { Skills as PersonSkills } from "../PersonObjects/Skills";
 
@@ -49,6 +49,7 @@ import { BlackOperations } from "./data/BlackOperations";
 import { GeneralActions } from "./data/GeneralActions";
 import { PlayerObject } from "../PersonObjects/Player/PlayerObject";
 import { Sleeve } from "../PersonObjects/Sleeve/Sleeve";
+import { autoCompleteTypeShorthand } from "./utils/terminalShorthands";
 
 export const BladeburnerPromise: PromisePair<number> = { promise: null, resolve: null };
 
@@ -433,61 +434,53 @@ export class Bladeburner {
         highLow = true;
       }
 
-      let actionId: ActionIdentifier;
-      switch (type) {
-        case "stamina":
-          // For stamina, the "name" variable is actually the stamina threshold
-          if (isNaN(parseFloat(name))) {
-            this.postToConsole("Invalid value specified for stamina threshold (must be numeric): " + name);
+      if (type === "stamina") {
+        // For stamina, the "name" variable is actually the stamina threshold
+        if (isNaN(parseFloat(name))) {
+          this.postToConsole("Invalid value specified for stamina threshold (must be numeric): " + name);
+        } else {
+          if (highLow) {
+            this.automateThreshHigh = Number(name);
           } else {
-            if (highLow) {
-              this.automateThreshHigh = Number(name);
-            } else {
-              this.automateThreshLow = Number(name);
-            }
-            this.log("Automate (" + (highLow ? "HIGH" : "LOW") + ") stamina threshold set to " + name);
+            this.automateThreshLow = Number(name);
           }
-          return;
-        case "general":
-        case "gen": {
-          if (!getEnumHelper("BladeburnerGeneralActionName").isMember(name)) {
+          this.log("Automate (" + (highLow ? "HIGH" : "LOW") + ") stamina threshold set to " + name);
+        }
+        return;
+      }
+
+      const actionId = autoCompleteTypeShorthand(type, name);
+
+      if (actionId === null) {
+        switch (type) {
+          case "general":
+          case "gen": {
             this.postToConsole("Invalid General Action name specified: " + name);
             return;
           }
-          actionId = { type: BladeburnerActionType.General, name };
-          break;
-        }
-        case "contract":
-        case "contracts": {
-          if (!getEnumHelper("BladeburnerContractName").isMember(name)) {
+          case "contract":
+          case "contracts": {
             this.postToConsole("Invalid Contract name specified: " + name);
             return;
           }
-          actionId = { type: BladeburnerActionType.Contract, name };
-          break;
-        }
-        case "ops":
-        case "op":
-        case "operations":
-        case "operation":
-          if (!getEnumHelper("BladeburnerOperationName").isMember(name)) {
+          case "ops":
+          case "op":
+          case "operations":
+          case "operation":
             this.postToConsole("Invalid Operation name specified: " + name);
             return;
-          }
-          actionId = { type: BladeburnerActionType.Operation, name };
-          break;
-        default:
-          this.postToConsole("Invalid use of automate command.");
-          return;
+          default:
+            this.postToConsole("Invalid use of automate command.");
+            return;
+        }
       }
+
       if (highLow) {
         this.automateActionHigh = actionId;
       } else {
         this.automateActionLow = actionId;
       }
       this.log("Automate (" + (highLow ? "HIGH" : "LOW") + ") action set to " + name);
-
-      return;
     }
   }
 
@@ -1406,10 +1399,10 @@ export class Bladeburner {
   }
 
   /** Return the action based on an ActionIdentifier, discriminating types when possible */
-  getActionObject(actionId: ActionIdentifier & { type: BladeburnerActionType.BlackOp }): BlackOperation;
-  getActionObject(actionId: ActionIdentifier & { type: BladeburnerActionType.Operation }): Operation;
-  getActionObject(actionId: ActionIdentifier & { type: BladeburnerActionType.Contract }): Contract;
-  getActionObject(actionId: ActionIdentifier & { type: BladeburnerActionType.General }): GeneralAction;
+  getActionObject(actionId: ActionIdFor<BlackOperation>): BlackOperation;
+  getActionObject(actionId: ActionIdFor<Operation>): Operation;
+  getActionObject(actionId: ActionIdFor<Contract>): Contract;
+  getActionObject(actionId: ActionIdFor<GeneralAction>): GeneralAction;
   getActionObject(actionId: ActionIdentifier): Action;
   getActionObject(actionId: ActionIdentifier): Action {
     switch (actionId.type) {
@@ -1427,36 +1420,8 @@ export class Bladeburner {
   /** Fuzzy matching for action identifiers. Should be removed in 3.0 */
   getActionFromTypeAndName(type: string, name: string): Action | null {
     if (!type || !name) return null;
-    const convertedType = type.toLowerCase().trim();
-    switch (convertedType) {
-      case "contract":
-      case "contracts":
-      case "contr":
-        if (!getEnumHelper("BladeburnerContractName").isMember(name)) return null;
-        return this.contracts[name];
-      case "operation":
-      case "operations":
-      case "op":
-      case "ops":
-        if (!getEnumHelper("BladeburnerOperationName").isMember(name)) return null;
-        return this.operations[name];
-      case "blackoperation":
-      case "black operation":
-      case "black operations":
-      case "black op":
-      case "black ops":
-      case "blackop":
-      case "blackops":
-        if (!getEnumHelper("BladeburnerBlackOpName").isMember(name)) return null;
-        return BlackOperations[name];
-      case "general":
-      case "general action":
-      case "gen": {
-        if (!getEnumHelper("BladeburnerGeneralActionName").isMember(name)) return null;
-        return GeneralActions[name];
-      }
-    }
-    return null;
+    const id = autoCompleteTypeShorthand(type, name);
+    return id ? this.getActionObject(id) : null;
   }
 
   static keysToSave = getKeyList(Bladeburner, { removedKeys: ["skillMultipliers"] });

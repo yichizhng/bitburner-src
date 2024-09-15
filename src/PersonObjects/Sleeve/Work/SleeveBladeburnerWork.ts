@@ -70,6 +70,7 @@ export class SleeveBladeburnerWork extends SleeveWorkClass {
       this.finish();
     }
   }
+
   get nextCompletion(): Promise<void> {
     if (!this.nextCompletionPair.promise)
       this.nextCompletionPair.promise = new Promise((r) => (this.nextCompletionPair.resolve = r));

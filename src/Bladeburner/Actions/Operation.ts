@@ -1,7 +1,7 @@
 import type { Person } from "../../PersonObjects/Person";
 import type { BlackOperation } from "./BlackOperation";
 import type { Bladeburner } from "../Bladeburner";
-import type { Availability, ActionIdentifier, SuccessChanceParams } from "../Types";
+import type { ActionIdFor, Availability, SuccessChanceParams } from "../Types";
 
 import { BladeburnerActionType, BladeburnerMultName, BladeburnerOperationName } from "@enums";
 import { BladeburnerConstants } from "../data/Constants";
@@ -9,6 +9,7 @@ import { ActionClass } from "./Action";
 import { Generic_fromJSON, IReviverValue, constructorsForReviver } from "../../utils/JSONReviver";
 import { LevelableActionClass, LevelableActionParams } from "./LevelableAction";
 import { clampInteger } from "../../utils/helpers/clampNumber";
+import { getEnumHelper } from "../../utils/EnumHelper";
 
 export interface OperationParams extends LevelableActionParams {
   name: BladeburnerOperationName;
@@ -16,18 +17,26 @@ export interface OperationParams extends LevelableActionParams {
 }
 
 export class Operation extends LevelableActionClass {
-  type: BladeburnerActionType.Operation = BladeburnerActionType.Operation;
-  name = BladeburnerOperationName.Investigation;
+  readonly type: BladeburnerActionType.Operation = BladeburnerActionType.Operation;
+  readonly name: BladeburnerOperationName;
   teamCount = 0;
-  get id(): ActionIdentifier {
-    return { type: this.type, name: this.name };
+
+  get id() {
+    return Operation.createId(this.name);
+  }
+
+  static IsAcceptedName(name: unknown): name is BladeburnerOperationName {
+    return getEnumHelper("BladeburnerOperationName").isMember(name);
+  }
+
+  static createId(name: BladeburnerOperationName): ActionIdFor<Operation> {
+    return { type: BladeburnerActionType.Operation, name };
   }
 
   constructor(params: OperationParams | null = null) {
     super(params);
-    if (!params) return;
-    this.name = params.name;
-    if (params.getAvailability) this.getAvailability = params.getAvailability;
+    this.name = params?.name ?? BladeburnerOperationName.Investigation;
+    if (params && params.getAvailability) this.getAvailability = params.getAvailability;
   }
 
   // These functions are shared between operations and blackops, so they are defined outside of Operation
@@ -45,6 +54,7 @@ export class Operation extends LevelableActionClass {
 
     return 1;
   }
+
   getSuccessChance(inst: Bladeburner, person: Person, params: SuccessChanceParams) {
     if (this.name === BladeburnerOperationName.Raid && inst.getCurrentCity().comms <= 0) {
       return 0;
