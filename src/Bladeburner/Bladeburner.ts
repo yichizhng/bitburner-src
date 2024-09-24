@@ -37,7 +37,6 @@ import { Settings } from "../Settings/Settings";
 import { formatTime } from "../utils/helpers/formatTime";
 import { joinFaction } from "../Faction/FactionHelpers";
 import { isSleeveInfiltrateWork } from "../PersonObjects/Sleeve/Work/SleeveInfiltrateWork";
-import { isSleeveSupportWork } from "../PersonObjects/Sleeve/Work/SleeveSupportWork";
 import { WorkStats, newWorkStats } from "../Work/WorkStats";
 import { getEnumHelper } from "../utils/EnumHelper";
 import { PartialRecord, createEnumKeyedRecord, getRecordEntries } from "../Types/Record";
@@ -50,10 +49,12 @@ import { GeneralActions } from "./data/GeneralActions";
 import { PlayerObject } from "../PersonObjects/Player/PlayerObject";
 import { Sleeve } from "../PersonObjects/Sleeve/Sleeve";
 import { autoCompleteTypeShorthand } from "./utils/terminalShorthands";
+import { resolveTeamCasualties, type OperationTeam } from "./Actions/TeamCasualties";
+import { shuffleArray } from "../Infiltration/ui/BribeGame";
 
 export const BladeburnerPromise: PromisePair<number> = { promise: null, resolve: null };
 
-export class Bladeburner {
+export class Bladeburner implements OperationTeam {
   numHosp = 0;
   moneyLost = 0;
   rank = 0;
@@ -102,6 +103,7 @@ export class Bladeburner {
   automateThreshLow = 0;
   consoleHistory: string[] = [];
   consoleLogs: string[] = ["Bladeburner Console", "Type 'help' to see console commands"];
+  getTeamCasualtiesRoll = getRandomIntInclusive;
 
   constructor() {
     this.contracts = createContracts();
@@ -750,32 +752,20 @@ export class Bladeburner {
     }
   }
 
+  killRandomSupportingSleeves(n: number) {
+    const sup = [...Player.sleevesSupportingBladeburner()]; // Explicit shallow copy
+    shuffleArray(sup);
+    sup.slice(0, Math.min(sup.length, n)).forEach((sleeve) => sleeve.kill());
+  }
+
   completeOperation(success: boolean): void {
     if (this.action?.type !== BladeburnerActionType.Operation) {
       throw new Error("completeOperation() called even though current action is not an Operation");
     }
     const action = this.getActionObject(this.action);
-
-    // Calculate team losses
-    const teamCount = action.teamCount;
-    if (teamCount >= 1) {
-      const maxLosses = success ? Math.ceil(teamCount / 2) : Math.floor(teamCount);
-      const losses = getRandomIntInclusive(0, maxLosses);
-      this.teamSize -= losses;
-      if (this.teamSize < this.sleeveSize) {
-        const sup = Player.sleeves.filter((x) => isSleeveSupportWork(x.currentWork));
-        for (let i = 0; i > this.teamSize - this.sleeveSize; i--) {
-          const r = Math.floor(Math.random() * sup.length);
-          sup[r].takeDamage(sup[r].hp.max);
-          sup.splice(r, 1);
-        }
-        // If this happens, all team members died and some sleeves took damage. In this case, teamSize = sleeveSize.
-        this.teamSize = this.sleeveSize;
-      }
-      this.teamLost += losses;
-      if (this.logging.ops && losses > 0) {
-        this.log("Lost " + formatNumberNoSuffix(losses, 0) + " team members during this " + action.name);
-      }
+    const deaths = resolveTeamCasualties(action, this, success);
+    if (this.logging.ops && deaths > 0) {
+      this.log("Lost " + formatNumberNoSuffix(deaths, 0) + " team members during this " + action.name);
     }
 
     const city = this.getCurrentCity();
@@ -992,9 +982,7 @@ export class Bladeburner {
           this.stamina = 0;
         }
 
-        // Team loss variables
-        const teamCount = action.teamCount;
-        let teamLossMax;
+        let deaths;
 
         if (action.attempt(this, person)) {
           retValue = this.getActionStats(action, person, true);
@@ -1004,7 +992,8 @@ export class Bladeburner {
             rankGain = addOffset(action.rankGain * currentNodeMults.BladeburnerRank, 10);
             this.changeRank(person, rankGain);
           }
-          teamLossMax = Math.ceil(teamCount / 2);
+
+          deaths = resolveTeamCasualties(action, this, true);
 
           if (this.logging.blackops) {
             this.log(
@@ -1028,7 +1017,8 @@ export class Bladeburner {
               this.moneyLost += cost;
             }
           }
-          teamLossMax = Math.floor(teamCount);
+
+          deaths = resolveTeamCasualties(action, this, false);
 
           if (this.logging.blackops) {
             this.log(
@@ -1042,26 +1032,10 @@ export class Bladeburner {
 
         this.resetAction(); // Stop regardless of success or fail
 
-        // Calculate team losses
-        if (teamCount >= 1) {
-          const losses = getRandomIntInclusive(1, teamLossMax);
-          this.teamSize -= losses;
-          if (this.teamSize < this.sleeveSize) {
-            const sup = Player.sleeves.filter((x) => isSleeveSupportWork(x.currentWork));
-            for (let i = 0; i > this.teamSize - this.sleeveSize; i--) {
-              const r = Math.floor(Math.random() * sup.length);
-              sup[r].takeDamage(sup[r].hp.max);
-              sup.splice(r, 1);
-            }
-            // If this happens, all team members died and some sleeves took damage. In this case, teamSize = sleeveSize.
-            this.teamSize = this.sleeveSize;
-          }
-          this.teamLost += losses;
-          if (this.logging.blackops) {
-            this.log(
-              `${person.whoAmI()}:  You lost ${formatNumberNoSuffix(losses, 0)} team members during ${action.name}.`,
-            );
-          }
+        if (this.logging.blackops && deaths > 0) {
+          this.log(
+            `${person.whoAmI()}:  You lost ${formatNumberNoSuffix(deaths, 0)} team members during ${action.name}.`,
+          );
         }
         break;
       }

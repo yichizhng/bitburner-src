@@ -5,6 +5,7 @@ import { BladeburnerActionType, BladeburnerBlackOpName } from "@enums";
 import { ActionClass, ActionParams } from "./Action";
 import { operationSkillSuccessBonus, operationTeamSuccessBonus } from "./Operation";
 import { getEnumHelper } from "../../utils/EnumHelper";
+import type { TeamActionWithCasualties } from "./TeamCasualties";
 
 interface BlackOpParams {
   name: BladeburnerBlackOpName;
@@ -12,7 +13,7 @@ interface BlackOpParams {
   n: number;
 }
 
-export class BlackOperation extends ActionClass {
+export class BlackOperation extends ActionClass implements TeamActionWithCasualties {
   readonly type: BladeburnerActionType.BlackOp = BladeburnerActionType.BlackOp;
   readonly name: BladeburnerBlackOpName;
   n: number;
@@ -54,6 +55,10 @@ export class BlackOperation extends ActionClass {
   }
 
   getChaosSuccessFactor(): number {
+    return 1;
+  }
+
+  getMinimumCasualties(): number {
     return 1;
   }
 
