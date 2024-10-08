@@ -48,6 +48,9 @@ function setInitialExpForPlayer() {
 
 // Prestige by purchasing augmentation
 export function prestigeAugmentation(): void {
+  // We must kill all scripts before doing anything else.
+  prestigeWorkerScripts();
+
   initBitNodeMultipliers();
 
   // Maintain invites to factions with the 'keepOnInstall' flag, and rumors about others
@@ -63,9 +66,6 @@ export function prestigeAugmentation(): void {
 
   Player.prestigeAugmentation();
   Go.prestigeAugmentation();
-
-  // Delete all Worker Scripts objects
-  prestigeWorkerScripts();
 
   const homeComp = Player.getHomeComputer();
   // Delete all servers except home computer
@@ -188,12 +188,13 @@ export function prestigeAugmentation(): void {
 
 // Prestige by destroying Bit Node and gaining a Source File
 export function prestigeSourceFile(isFlume: boolean): void {
+  // We must kill all scripts before doing anything else.
+  prestigeWorkerScripts();
+
   initBitNodeMultipliers();
 
   Player.prestigeSourceFile();
   Go.prestigeSourceFile();
-
-  prestigeWorkerScripts(); // Delete all Worker Scripts objects
 
   const homeComp = Player.getHomeComputer();
 
