@@ -36,7 +36,7 @@ const hackingContractsInfo =
 const fieldWorkInfo =
   "Carry out field missions for your faction. " +
   "Your effectiveness, which determines how much " +
-  "reputation you gain for this faction, is based on all of your stats equally . " +
+  "reputation you gain for this faction, is based on all of your stats equally. " +
   "You will gain exp for all stats.";
 const securityWorkInfo =
   "Serve in a security detail for your faction. " +
