@@ -25,6 +25,7 @@ import {
 } from "../../InteractiveTutorial";
 import { useRerender } from "../React/hooks";
 import { Settings } from "../../Settings/Settings";
+import { NsApiDocumentationLink } from "../React/NsApiDocumentationLink";
 
 interface IContent {
   content: React.ReactElement;
@@ -339,10 +340,11 @@ export function InteractiveTutorialRoot(): React.ReactElement {
           <Typography classes={{ root: classes.code }}>
             {
               <CopyableText
-                value={`export async function main(ns) {
-	while(true) {
-		await ns.hack('n00dles');
-	}
+                value={`/** @param {NS} ns */
+export async function main(ns) {
+  while (true) {
+    await ns.hack("n00dles");
+  }
 }`}
               />
             }
@@ -350,6 +352,9 @@ export function InteractiveTutorialRoot(): React.ReactElement {
           <Typography>
             For anyone with basic programming experience, this code should be straightforward. This script will
             continuously hack the n00dles server.
+            <br />
+            <br />
+            To access <NsApiDocumentationLink />, press the link at the bottom.
             <br />
             <br />
             To save and close the script editor, press the button at the bottom.
