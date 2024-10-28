@@ -4399,16 +4399,27 @@ export interface GoAnalysis {
 export interface GoCheat {
   /**
    * Returns your chance of successfully playing one of the special moves in the ns.go.cheat API.
-   * Scales with your crime success rate stat.
+   * Scales up with your crime success rate stat.
+   * Scales down with the number of times you've attempted to cheat in the current game.
    *
    * Warning: if you fail to play a cheat move, your turn will be skipped. After your first cheat attempt, if you fail, there is a
    * small (~10%) chance you will instantly be ejected from the subnet.
+   *
+   * @param cheatCount - Optional override for the number of cheats already attempted. Defaults to the number of cheats attempted in the current game.
    *
    * @remarks
    * RAM cost: 1 GB
    * Requires BitNode 14.2 to use
    */
-  getCheatSuccessChance(): number;
+  getCheatSuccessChance(cheatCount?: number): number;
+  /**
+   * Returns the number of times you've attempted to cheat in the current game.
+   *
+   * @remarks
+   * RAM cost: 1 GB
+   * Requires BitNode 14.2 to use
+   */
+  getCheatCount(): number;
   /**
    * Attempts to remove an existing router, leaving an empty node behind.
    *

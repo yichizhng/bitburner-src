@@ -100,9 +100,16 @@ export function NetscriptGo(): InternalAPI<NSGo> {
       },
     },
     cheat: {
-      getCheatSuccessChance: (ctx: NetscriptContext) => () => {
+      getCheatSuccessChance:
+        (ctx: NetscriptContext) =>
+        (_cheatCount = Go.currentGame.cheatCount) => {
+          checkCheatApiAccess(error(ctx));
+          const cheatCount = helpers.number(ctx, "cheatCount", _cheatCount);
+          return cheatSuccessChance(cheatCount);
+        },
+      getCheatCount: (ctx: NetscriptContext) => () => {
         checkCheatApiAccess(error(ctx));
-        return cheatSuccessChance(Go.currentGame.cheatCount);
+        return Go.currentGame.cheatCount;
       },
       removeRouter:
         (ctx: NetscriptContext) =>
