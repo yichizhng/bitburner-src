@@ -701,10 +701,6 @@ export class Bladeburner implements OperationTeam {
     return charismaEff;
   }
 
-  getRecruitmentSuccessChance(person: Person): number {
-    return Math.pow(person.skills.charisma, 0.45) / (this.teamSize - this.sleeveSize + 1);
-  }
-
   sleeveSupport(joining: boolean): void {
     if (joining) {
       this.sleeveSize += 1;
