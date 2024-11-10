@@ -9562,6 +9562,8 @@ interface UserInterfaceTheme {
  */
 interface IStyleSettings {
   fontFamily: string;
+  fontSize: number;
+  tailFontSize: number;
   lineHeight: number;
 }
 
