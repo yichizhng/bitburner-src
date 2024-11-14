@@ -225,7 +225,12 @@ class BitburnerSaveObject {
 
     let parsedSaveData;
     try {
-      parsedSaveData = JSON.parse(decodedSaveData);
+      parsedSaveData = JSON.parse(decodedSaveData) as {
+        ctor: string;
+        data: {
+          PlayerSave: string;
+        };
+      };
     } catch (error) {
       console.error(error); // We'll handle below
     }
@@ -632,6 +637,7 @@ function evaluateVersionCompatibility(ver: string | number): void {
     if (isNaN(intExp)) intExp = 0;
     anyPlayer.exp.intelligence += intExp;
     for (const field of removePlayerFields) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
       delete anyPlayer[field];
     }
     for (const sleeve of anyPlayer.sleeves) {
@@ -640,6 +646,7 @@ function evaluateVersionCompatibility(ver: string | number): void {
       if (isNaN(intExp)) intExp = 0;
       anySleeve.exp.intelligence += intExp;
       for (const field of removeSleeveFields) {
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
         delete sleeve[field];
       }
     }
