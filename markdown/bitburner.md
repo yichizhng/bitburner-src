@@ -16,6 +16,7 @@
 |  [BladeburnerSkillName](./bitburner.bladeburnerskillname.md) | Skill names type of Bladeburner |
 |  [CityName](./bitburner.cityname.md) | Names of all cities |
 |  [CompanyName](./bitburner.companyname.md) | Names of all companies |
+|  [CreatingCorporationCheckResult](./bitburner.creatingcorporationcheckresult.md) |  |
 |  [CrimeType](./bitburner.crimetype.md) |  |
 |  [FactionWorkType](./bitburner.factionworktype.md) |  |
 |  [GymLocationName](./bitburner.gymlocationname.md) | Locations of gym |

@@ -10,7 +10,7 @@ import { OfficeSpace } from "./OfficeSpace";
 import { Material } from "./Material";
 import { Product } from "./Product";
 import { Warehouse } from "./Warehouse";
-import { FactionName, IndustryType } from "@enums";
+import { CreatingCorporationCheckResult, FactionName, IndustryType } from "@enums";
 import { ResearchMap } from "./ResearchMap";
 import { isRelevantMaterial } from "./ui/Helpers";
 import { CityName } from "@enums";
@@ -22,26 +22,30 @@ import {
   buybackSharesFailureReason,
   issueNewSharesFailureReason,
   costOfCreatingCorporation,
+  canCreateCorporation,
 } from "./helpers";
 import { PositiveInteger, Result } from "../types";
-import { currentNodeMults } from "../BitNode/BitNodeMultipliers";
 import { Factions } from "../Faction/Factions";
+import { throwIfReachable } from "../utils/helpers/throwIfReachable";
 
 export function createCorporation(corporationName: string, selfFund: boolean, restart: boolean): boolean {
-  if (!Player.canAccessCorporation()) {
-    return false;
+  const checkResult = canCreateCorporation(selfFund, restart);
+  switch (checkResult) {
+    case CreatingCorporationCheckResult.Success:
+      break;
+    case CreatingCorporationCheckResult.NoSf3OrDisabled:
+    case CreatingCorporationCheckResult.CorporationExists:
+      return false;
+    case CreatingCorporationCheckResult.UseSeedMoneyOutsideBN3:
+    case CreatingCorporationCheckResult.DisabledBySoftCap:
+      // In order to maintain backward compatibility, we have to throw an error in these cases.
+      throw new Error(checkResult);
+    default:
+      throwIfReachable(checkResult);
   }
-  if (Player.corporation && !restart) {
-    return false;
-  }
+
   if (!corporationName) {
     return false;
-  }
-  if (Player.bitNodeN !== 3 && !selfFund) {
-    throw new Error("Cannot use seed funds outside of BitNode 3");
-  }
-  if (currentNodeMults.CorporationSoftcap < 0.15) {
-    throw new Error(`You cannot create a corporation in BitNode ${Player.bitNodeN}`);
   }
 
   if (selfFund) {

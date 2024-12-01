@@ -8783,12 +8783,23 @@ export interface WarehouseAPI {
 }
 
 /**
+ * @public
+ */
+declare enum CreatingCorporationCheckResult {
+  Success = "Success",
+  NoSf3OrDisabled = "NoSf3OrDisabled",
+  CorporationExists = "CorporationExists",
+  UseSeedMoneyOutsideBN3 = "UseSeedMoneyOutsideBN3",
+  DisabledBySoftCap = "DisabledBySoftCap",
+}
+
+/**
  * Corporation API
  * @public
  */
 export interface Corporation extends WarehouseAPI, OfficeAPI {
   /**
-   * Returns whether the player has a corporation. Does not require API access.
+   * Return whether the player has a corporation. Does not require API access.
    *
    * @remarks
    * RAM cost: 0 GB
@@ -8798,19 +8809,28 @@ export interface Corporation extends WarehouseAPI, OfficeAPI {
   hasCorporation(): boolean;
 
   /**
-   * Create a Corporation.
+   * Return whether the player can create a corporation. Does not require API access.
+   *
+   * @remarks
+   * RAM cost: 0 GB
+   *
+   * @param selfFund - true if you want to self-fund, false otherwise
+   * @returns Result of the check
+   */
+  canCreateCorporation(selfFund: boolean): CreatingCorporationCheckResult;
+
+  /**
+   * Create a Corporation. You should use {@link Corporation.canCreateCorporation | canCreateCorporation} to check if
+   * you are unsure you can do it, because it throws an error in these cases:
+   *
+   * - Use seed money outside BitNode 3.
+   *
+   * - Be in a BitNode that has CorporationSoftcap (a BitNode modifier) less than 0.15.
    *
    * @remarks
    * RAM cost: 20 GB
    *
-   * This function throws an error if:
-   *
-   * - Use seed money outside BitNode 3.
-   *
-   * - Be in a BitNode that has CorporationSoftcap (a BN modifier) less than 0.15. Use
-   * {@link NS.getBitNodeMultipliers | getBitNodeMultipliers} to get the value of this modifier.
-   *
-   * @param corporationName - Name of the corporation
+   * @param corporationName - Name of the corporation. It must be a non-empty string.
    * @param selfFund - If you want to self-fund. Defaults to true, false will only work in BitNode 3.
    * @returns true if created and false if not
    */
