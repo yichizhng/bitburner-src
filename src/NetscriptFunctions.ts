@@ -616,6 +616,18 @@ export const ns: InternalAPI<NSFull> = {
       runningScriptObj.title = typeof title === "string" ? title : wrapUserNode(title);
       runningScriptObj.tailProps?.rerender();
     },
+  setTailFontSize:
+    (ctx) =>
+    (_pixel, scriptID, hostname, ...scriptArgs) => {
+      const ident = helpers.scriptIdentifier(ctx, scriptID, hostname, scriptArgs);
+      const runningScriptObj = helpers.getRunningScript(ctx, ident);
+      if (runningScriptObj == null) {
+        helpers.log(ctx, () => helpers.getCannotFindRunningScriptErrorMessage(ident));
+        return;
+      }
+      if (_pixel === undefined) runningScriptObj.tailProps?.setFontSize(undefined);
+      else runningScriptObj.tailProps?.setFontSize(helpers.number(ctx, "pixel", _pixel));
+    },
   nuke: (ctx) => (_hostname) => {
     const hostname = helpers.string(ctx, "hostname", _hostname);
 
