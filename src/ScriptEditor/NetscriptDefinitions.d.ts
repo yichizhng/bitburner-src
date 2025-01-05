@@ -7164,7 +7164,7 @@ export interface NS {
    * ns.tprint(`A purchased server with ${ns.formatRam(ram)} costs $${ns.formatNumber(cost)}`);
    * ```
    * @param ram - Amount of RAM of a potential purchased server, in GB. Must be a power of 2 (2, 4, 8, 16, etc.). Maximum value of 1048576 (2^20).
-   * @returns The cost to purchase a server with the specified amount of ram.
+   * @returns The cost to purchase a server with the specified amount of ram, or returns Infinity if ram is not a valid amount.
    */
   getPurchasedServerCost(ram: number): number;
 
@@ -7214,7 +7214,7 @@ export interface NS {
    *
    * @param hostname - Hostname of the server to upgrade.
    * @param ram - Amount of RAM of the purchased server, in GB. Must be a power of 2 (2, 4, 8, 16, etc.). Maximum value of 1048576 (2^20).
-   * @returns The price to upgrade.
+   * @returns The price to upgrade or -1 if either input is not valid, i.e. hostname is not the name of a purchased server or ram is not a valid amount.
    */
   getPurchasedServerUpgradeCost(hostname: string, ram: number): number;
 
