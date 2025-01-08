@@ -27,7 +27,6 @@ interface IProps {
 const useStyles = makeStyles()({
   noformat: {
     whiteSpace: "pre-wrap",
-    lineHeight: "1em",
   },
 });
 
