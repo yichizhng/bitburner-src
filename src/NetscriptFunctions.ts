@@ -294,16 +294,15 @@ export const ns: InternalAPI<NSFull> = {
       if (host === null) {
         throw helpers.errorMessage(ctx, `Cannot find host of WorkerScript. Hostname: ${ctx.workerScript.hostname}.`);
       }
-      const moneyBefore = server.moneyAvailable <= 0 ? 1 : server.moneyAvailable;
-      processSingleServerGrowth(server, threads, host.cpuCores);
+      const moneyBefore = server.moneyAvailable;
+      const growth = processSingleServerGrowth(server, threads, host.cpuCores);
       const moneyAfter = server.moneyAvailable;
       ctx.workerScript.scriptRef.recordGrow(server.hostname, threads);
       const expGain = calculateHackingExpGain(server, Player) * threads;
-      const logGrowPercent = moneyAfter / moneyBefore - 1;
       helpers.log(
         ctx,
         () =>
-          `Available money on '${server.hostname}' grown by ${formatPercent(logGrowPercent, 6)}. Gained ${formatExp(
+          `Available money on '${server.hostname}' grown by ${formatPercent(growth - 1, 6)}. Gained ${formatExp(
             expGain,
           )} hacking exp (t=${formatThreads(threads)}).`,
       );
@@ -312,7 +311,7 @@ export const ns: InternalAPI<NSFull> = {
       if (stock) {
         influenceStockThroughServerGrow(server, moneyAfter - moneyBefore);
       }
-      return Promise.resolve(moneyAfter / moneyBefore);
+      return Promise.resolve(server.moneyMax === 0 ? 0 : growth);
     });
   },
   growthAnalyze:
