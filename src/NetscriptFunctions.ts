@@ -811,7 +811,7 @@ export const ns: InternalAPI<NSFull> = {
       const killByPid = typeof ident === "number";
       if (killByPid) {
         // Kill by pid
-        res = killWorkerScriptByPid(ident);
+        res = killWorkerScriptByPid(ident, ctx.workerScript);
       } else {
         // Kill by filename/hostname
         if (scriptID === undefined) {
@@ -826,7 +826,7 @@ export const ns: InternalAPI<NSFull> = {
 
         res = true;
         for (const pid of byPid.keys()) {
-          res &&= killWorkerScriptByPid(pid);
+          res &&= killWorkerScriptByPid(pid, ctx.workerScript);
         }
       }
 
@@ -861,7 +861,7 @@ export const ns: InternalAPI<NSFull> = {
       for (const byPid of server.runningScriptMap.values()) {
         for (const pid of byPid.keys()) {
           if (safetyGuard && pid == ctx.workerScript.pid) continue;
-          killWorkerScriptByPid(pid);
+          killWorkerScriptByPid(pid, ctx.workerScript);
           ++scriptsKilled;
         }
       }
@@ -1494,7 +1494,7 @@ export const ns: InternalAPI<NSFull> = {
       if (!pattern.test(key)) continue;
       suc = true;
       for (const pid of byPid.keys()) {
-        killWorkerScriptByPid(pid);
+        killWorkerScriptByPid(pid, ctx.workerScript);
       }
     }
     return suc;
