@@ -7905,13 +7905,18 @@ export interface NS {
   getMoneySources(): MoneySources;
 
   /**
-   * Add callback function when the script dies
+   * Add a callback to be executed when the script dies.
    * @remarks
    * RAM cost: 0 GB
    *
    * NS2 exclusive
    *
-   * Add callback to be executed when the script dies.
+   * Each script can only register one callback per callback ID.
+   * If another callback is registered with the same callback ID
+   * the previous callback with that ID is forgotten and will not be executed when the script dies.
+   *
+   * @param f - A function to execute when the script dies.
+   * @param id - Callback ID. Optional, defaults to `"default"`.
    */
   atExit(f: () => void, id?: string): void;
 
