@@ -26,7 +26,7 @@ export function NetscriptBladeburner(): InternalAPI<INetscriptBladeburner> {
     return;
   };
   const getBladeburner = function (ctx: NetscriptContext): Bladeburner {
-    const apiAccess = canAccessBitNodeFeature(7);
+    const apiAccess = canAccessBitNodeFeature(7) || canAccessBitNodeFeature(6);
     if (!apiAccess) {
       throw helpers.errorMessage(ctx, "You have not unlocked the Bladeburner API.", "API ACCESS");
     }
@@ -307,7 +307,9 @@ export function NetscriptBladeburner(): InternalAPI<INetscriptBladeburner> {
       return !!attempt.success;
     },
     joinBladeburnerDivision: (ctx) => () => {
-      if (!canAccessBitNodeFeature(7) || Player.bitNodeOptions.disableBladeburner) {
+      if (!canAccessBitNodeFeature(7) && !canAccessBitNodeFeature(6)) {
+        return false; //Does not have bitnode 6 or 7
+      } else if (Player.bitNodeOptions.disableBladeburner) {
         return false;
       }
       if (currentNodeMults.BladeburnerRank === 0) {
