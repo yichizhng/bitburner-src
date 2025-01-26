@@ -1,13 +1,10 @@
-import type { FactionName } from "@enums";
-import { codingContractTypesMetadata } from "./data/codingcontracttypes";
+import { FactionName, CodingContractName } from "@enums";
+import { CodingContractTypes } from "./data/codingcontracttypes";
 
 import { Generic_fromJSON, Generic_toJSON, IReviverValue, constructorsForReviver } from "./utils/JSONReviver";
 import { CodingContractEvent } from "./ui/React/CodingContractModal";
 import { ContractFilePath, resolveContractFilePath } from "./Paths/ContractFilePath";
 import { assertObject } from "./utils/TypeAssertion";
-
-/* Contract Types */
-export const CodingContractTypes = Object.fromEntries(codingContractTypesMetadata.map((x) => [x.name, x]));
 
 // Numeric enum
 /** Enum representing the different types of rewards a Coding Contract can give */
@@ -62,9 +59,13 @@ export class CodingContract {
   tries = 0;
 
   /* String representing the contract's type. Must match type in ContractTypes */
-  type: string;
+  type: CodingContractName;
 
-  constructor(fn = "default.cct", type = "Find Largest Prime Factor", reward: ICodingContractReward | null = null) {
+  constructor(
+    fn = "default.cct",
+    type = CodingContractName.FindLargestPrimeFactor,
+    reward: ICodingContractReward | null = null,
+  ) {
     const path = resolveContractFilePath(fn);
     if (!path) throw new Error(`Bad file path while creating a coding contract: ${fn}`);
     if (!CodingContractTypes[type]) {
@@ -94,12 +95,22 @@ export class CodingContract {
     return CodingContractTypes[this.type].numTries ?? 10;
   }
 
-  getType(): string {
+  getType(): CodingContractName {
     return this.type;
   }
 
-  isSolution(solution: string): boolean {
-    return CodingContractTypes[this.type].solver(this.state, solution);
+  /** Checks if the answer is in the correct format. */
+  isValid(answer: unknown): boolean {
+    if (typeof answer === "string") answer = CodingContractTypes[this.type].convertAnswer(answer);
+    return CodingContractTypes[this.type].validateAnswer(answer);
+  }
+
+  isSolution(solution: unknown): boolean {
+    const type = CodingContractTypes[this.type];
+    if (typeof solution === "string") solution = type.convertAnswer(solution);
+    if (!this.isValid(solution)) return false;
+
+    return type.solver(this.state, solution);
   }
 
   /** Creates a popup to prompt the player to solve the problem */

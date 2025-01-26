@@ -17,13 +17,6 @@ interface Skills {
   intelligence: number;
 }
 
-// TODO: provide same treatment to CodingContractData as for SleeveTask (actual types)
-/**
- * Coding contract data will differ depending on coding contract.
- * @public
- */
-type CodingContractData = any;
-
 /** @public */
 type ScriptArg = string | number | boolean;
 
@@ -3864,7 +3857,9 @@ export interface CodingContract {
    *
    * @example
    * ```js
-   * const reward = ns.codingcontract.attempt(yourSolution, filename, hostname);
+   * const reward = ns.codingcontract.attempt("[solution, as, a, string]", filename, hostname);
+   * // or
+   * const reward = ns.codingcontract.attempt(["answer", "as", "an", "array"], filename, hostname);
    * if (reward) {
    *   ns.tprint(`Contract solved successfully! Reward: ${reward}`);
    * } else {
@@ -3872,13 +3867,13 @@ export interface CodingContract {
    * }
    * ```
    *
-   * @param answer - Attempted solution for the contract.
+   * @param answer - Attempted solution for the contract. This can be a string formatted like submitting manually, or the answer in the format of the specific contract type.
    * @param filename - Filename of the contract.
    * @param host - Hostname of the server containing the contract. Optional. Defaults to current server if not
    *   provided.
    * @returns A reward description string on success, or an empty string on failure.
    */
-  attempt(answer: string | number | any[], filename: string, host?: string): string;
+  attempt(answer: any, filename: string, host?: string): string;
 
   /**
    * Get the type of a coding contract.
@@ -3892,7 +3887,7 @@ export interface CodingContract {
    * @param host - Hostname of the server containing the contract. Optional. Defaults to current server if not provided.
    * @returns Name describing the type of problem posed by the Coding Contract.
    */
-  getContractType(filename: string, host?: string): string;
+  getContractType(filename: string, host?: string): `${CodingContractName}`;
 
   /**
    * Get the description.
@@ -3920,7 +3915,31 @@ export interface CodingContract {
    * @param host - Host of the server containing the contract. Optional. Defaults to current server if not provided.
    * @returns The specified contract’s data, data type depends on contract type.
    */
-  getData(filename: string, host?: string): CodingContractData;
+  getData(filename: string, host?: string): any;
+
+  /**
+   * Get various data about a specific contract.
+   * @remarks
+   * RAM cost: 15 GB
+   *
+   * The returned object includes the type, data, description as well as methods for getting the number of tries remaining and submitting your answer.
+   * Depending on the type of the contract, the data is typed differently.
+   * Using type-narrowing, you can get the correct type of the data:
+   *
+   * @example
+   * ```js
+   * const contract = ns.codingcontract.getContract(fileName, hostName);
+   * if (contract.type === ns.enums.CodingContractName.FindLargestPrimeFactor) {
+   *   const data = contract.data;
+   *   // ^? data: number
+   * }
+   * ```
+   *
+   * @param filename - Filename of the contract.
+   * @param host - Host of the server containing the contract. Optional. Default to the current server if not provided.
+   * @returns An object containing various data about the contract specified.
+   */
+  getContract(filename: string, host?: string): CodingContractObject;
 
   /**
    * Get the number of attempts remaining.
@@ -3952,7 +3971,7 @@ export interface CodingContract {
    * @remarks
    * RAM cost: 0 GB
    */
-  getContractTypes(): string[];
+  getContractTypes(): `${CodingContractName}`[];
 }
 
 /**
@@ -8331,6 +8350,85 @@ declare enum CompanyName {
   NoodleBar = "Noodle Bar",
 }
 
+declare enum CodingContractName {
+  FindLargestPrimeFactor = "Find Largest Prime Factor",
+  SubarrayWithMaximumSum = "Subarray with Maximum Sum",
+  TotalWaysToSum = "Total Ways to Sum",
+  TotalWaysToSumII = "Total Ways to Sum II",
+  SpiralizeMatrix = "Spiralize Matrix",
+  ArrayJumpingGame = "Array Jumping Game",
+  ArrayJumpingGameII = "Array Jumping Game II",
+  MergeOverlappingIntervals = "Merge Overlapping Intervals",
+  GenerateIPAddresses = "Generate IP Addresses",
+  AlgorithmicStockTraderI = "Algorithmic Stock Trader I",
+  AlgorithmicStockTraderII = "Algorithmic Stock Trader II",
+  AlgorithmicStockTraderIII = "Algorithmic Stock Trader III",
+  AlgorithmicStockTraderIV = "Algorithmic Stock Trader IV",
+  MinimumPathSumInATriangle = "Minimum Path Sum in a Triangle",
+  UniquePathsInAGridI = "Unique Paths in a Grid I",
+  UniquePathsInAGridII = "Unique Paths in a Grid II",
+  ShortestPathInAGrid = "Shortest Path in a Grid",
+  SanitizeParenthesesInExpression = "Sanitize Parentheses in Expression",
+  FindAllValidMathExpressions = "Find All Valid Math Expressions",
+  HammingCodesIntegerToEncodedBinary = "HammingCodes: Integer to Encoded Binary",
+  HammingCodesEncodedBinaryToInteger = "HammingCodes: Encoded Binary to Integer",
+  Proper2ColoringOfAGraph = "Proper 2-Coloring of a Graph",
+  CompressionIRLECompression = "Compression I: RLE Compression",
+  CompressionIILZDecompression = "Compression II: LZ Decompression",
+  CompressionIIILZCompression = "Compression III: LZ Compression",
+  EncryptionICaesarCipher = "Encryption I: Caesar Cipher",
+  EncryptionIIVigenereCipher = "Encryption II: Vigenère Cipher",
+  SquareRoot = "Square Root",
+}
+
+export type CodingContractSignatures = {
+  [CodingContractName.FindLargestPrimeFactor]: [number, number];
+  [CodingContractName.SubarrayWithMaximumSum]: [number[], number];
+  [CodingContractName.TotalWaysToSum]: [number, number];
+  [CodingContractName.TotalWaysToSumII]: [[number, number[]], number];
+  [CodingContractName.SpiralizeMatrix]: [number[][], number[]];
+  [CodingContractName.ArrayJumpingGame]: [number[], 1 | 0];
+  [CodingContractName.ArrayJumpingGameII]: [number[], number];
+  [CodingContractName.MergeOverlappingIntervals]: [[number, number][], [number, number][]];
+  [CodingContractName.GenerateIPAddresses]: [string, string[]];
+  [CodingContractName.AlgorithmicStockTraderI]: [number[], number];
+  [CodingContractName.AlgorithmicStockTraderII]: [number[], number];
+  [CodingContractName.AlgorithmicStockTraderIII]: [number[], number];
+  [CodingContractName.AlgorithmicStockTraderIV]: [[number, number[]], number];
+  [CodingContractName.MinimumPathSumInATriangle]: [number[][], number];
+  [CodingContractName.UniquePathsInAGridI]: [[number, number], number];
+  [CodingContractName.UniquePathsInAGridII]: [(1 | 0)[][], number];
+  [CodingContractName.ShortestPathInAGrid]: [(1 | 0)[][], string];
+  [CodingContractName.SanitizeParenthesesInExpression]: [string, string[]];
+  [CodingContractName.FindAllValidMathExpressions]: [[string, number], string[]];
+  [CodingContractName.HammingCodesIntegerToEncodedBinary]: [number, string];
+  [CodingContractName.HammingCodesEncodedBinaryToInteger]: [string, number];
+  [CodingContractName.Proper2ColoringOfAGraph]: [[number, [number, number][]], (1 | 0)[]];
+  [CodingContractName.CompressionIRLECompression]: [string, string];
+  [CodingContractName.CompressionIILZDecompression]: [string, string];
+  [CodingContractName.CompressionIIILZCompression]: [string, string];
+  [CodingContractName.EncryptionICaesarCipher]: [[string, number], string];
+  [CodingContractName.EncryptionIIVigenereCipher]: [[string, string], string];
+  [CodingContractName.SquareRoot]: [bigint, bigint, [string, string]];
+};
+
+export type CodingContractData<T extends string> = T extends `${keyof CodingContractSignatures}`
+  ? CodingContractSignatures[T][0]
+  : any;
+export type CodingContractAnswer<T extends string> = T extends `${keyof CodingContractSignatures}`
+  ? CodingContractSignatures[T][1]
+  : any;
+
+export type CodingContractObject = {
+  [T in keyof CodingContractSignatures]: {
+    type: T;
+    data: CodingContractSignatures[T][0];
+    submit: (answer: CodingContractSignatures[T][1] | string) => string;
+    description: string;
+    numTriesRemaining: () => number;
+  };
+}[keyof CodingContractSignatures];
+
 /** @public */
 export type NSEnums = {
   CityName: typeof CityName;
@@ -8343,6 +8441,7 @@ export type NSEnums = {
   ToastVariant: typeof ToastVariant;
   UniversityClassType: typeof UniversityClassType;
   CompanyName: typeof CompanyName;
+  CodingContractName: typeof CodingContractName;
 };
 
 /**
