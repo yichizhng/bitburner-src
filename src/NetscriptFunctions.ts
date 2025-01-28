@@ -26,6 +26,7 @@ import {
   ToastVariant,
   UniversityClassType,
   CompanyName,
+  FactionName,
   type MessageFilename,
 } from "@enums";
 import { PromptEvent } from "./ui/React/PromptManager";
@@ -124,6 +125,7 @@ export const enums: NSEnums = {
   ToastVariant,
   UniversityClassType,
   CompanyName,
+  FactionName,
   CodingContractName,
 };
 for (const val of Object.values(enums)) Object.freeze(val);
