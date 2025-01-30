@@ -1794,6 +1794,14 @@ export interface BitNodeBooleanOptions {
  */
 export interface Singularity {
   /**
+   * This function returns the save data.
+   *
+   * @remarks
+   * RAM cost: 1 GB * 16/4/1
+   */
+  getSaveData(): Promise<Uint8Array>;
+
+  /**
    * Backup game save.
    * @remarks
    * RAM cost: 1 GB * 16/4/1
