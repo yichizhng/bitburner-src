@@ -44,7 +44,6 @@ import { findEnumMember } from "../utils/helpers/enum";
 import { Engine } from "../engine";
 import { getEnumHelper } from "../utils/EnumHelper";
 import { ScriptFilePath, resolveScriptFilePath } from "../Paths/ScriptFilePath";
-import { root } from "../Paths/Directory";
 import { getRecordEntries } from "../Types/Record";
 import { JobTracks } from "../Company/data/JobTracks";
 import { ServerConstants } from "../Server/data/Constants";
@@ -52,6 +51,7 @@ import { blackOpsArray } from "../Bladeburner/data/BlackOperations";
 import { calculateEffectiveRequiredReputation } from "../Company/utils";
 import { calculateFavorAfterResetting } from "../Faction/formulas/favor";
 import { validBitNodes } from "../BitNode/BitNodeUtils";
+import { exceptionAlert } from "../utils/helpers/exceptionAlert";
 
 export function NetscriptSingularity(): InternalAPI<ISingularity> {
   const runAfterReset = function (cbScript: ScriptFilePath) {
@@ -479,40 +479,34 @@ export function NetscriptSingularity(): InternalAPI<ISingularity> {
         throw helpers.errorMessage(ctx, `Invalid hostname: '${hostname}'`);
       }
 
-      //Home case
-      if (hostname === "home") {
-        Player.getCurrentServer().isConnectedTo = false;
-        Player.currentServer = Player.getHomeComputer().hostname;
-        Player.getCurrentServer().isConnectedTo = true;
-        Terminal.setcwd(root);
-        return true;
-      }
-
-      //Adjacent server case
+      // Adjacent servers
       const server = Player.getCurrentServer();
       for (let i = 0; i < server.serversOnNetwork.length; i++) {
         const other = getServerOnNetwork(server, i);
-        if (other === null) continue;
-        if (other.hostname == hostname) {
-          Player.getCurrentServer().isConnectedTo = false;
-          Player.currentServer = target.hostname;
-          Player.getCurrentServer().isConnectedTo = true;
-          Terminal.setcwd(root);
+        if (other === null) {
+          exceptionAlert(
+            new Error(
+              `${server.serversOnNetwork[i]} is on the network of ${server.hostname}, but we cannot find its data.`,
+            ),
+          );
+          return false;
+        }
+        if (other.hostname === hostname) {
+          Terminal.connectToServer(hostname, true);
           return true;
         }
       }
 
-      //Backdoor case
-      const other = GetServer(hostname);
-      if (other !== null && other instanceof Server && other.backdoorInstalled) {
-        Player.getCurrentServer().isConnectedTo = false;
-        Player.currentServer = target.hostname;
-        Player.getCurrentServer().isConnectedTo = true;
-        Terminal.setcwd(root);
+      /**
+       * Backdoored + owned servers (home, private servers, or hacknet servers). With home computer, purchasedByPlayer
+       * is true.
+       */
+      if (target.backdoorInstalled || target.purchasedByPlayer) {
+        Terminal.connectToServer(hostname, true);
         return true;
       }
 
-      //Failure case
+      // Failure case
       return false;
     },
     manualHack: (ctx) => () => {
