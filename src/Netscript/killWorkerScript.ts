@@ -39,9 +39,12 @@ function stopAndCleanUpWorkerScript(ws: WorkerScript): void {
   // Important: Only this function can set stopFlag!
   if (ws.env.stopFlag) return;
 
-  //Clean up any ongoing netscriptDelay
-  if (ws.delay) clearTimeout(ws.delay);
-  ws.delayReject?.(new ScriptDeath(ws));
+  //Clean up any ongoing netscriptDelays
+  const sd = new ScriptDeath(ws);
+  for (const timeoutID in ws.delayRejects) {
+    clearTimeout(timeoutID);
+    ws.delayRejects[timeoutID](sd);
+  }
   ws.env.runningFn = "";
   const atExit = ws.atExit;
   //Calling ns.exit inside ns.atExit can lead to recursion

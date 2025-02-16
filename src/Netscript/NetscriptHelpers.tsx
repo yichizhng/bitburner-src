@@ -312,7 +312,7 @@ function validateHGWOptions(ctx: NetscriptContext, opts: unknown): CompleteHGWOp
     throw errorMessage(ctx, `additionalMsec too large (>1e9), got ${options.additionalMsec}`);
   }
   const requestedThreads = options.threads;
-  const threads = ctx.workerScript.scriptRef.threads;
+  const threads = ctx.workerScript.availableThreads;
   if (!requestedThreads) {
     result.threads = (isNaN(threads) || threads < 1 ? 1 : threads) as PositiveInteger;
   } else {
@@ -348,14 +348,15 @@ function checkEnvFlags(ctx: NetscriptContext): void {
     log(ctx, () => "Failed to run due to script being killed.");
     throw new ScriptDeath(ws);
   }
-  if (ws.env.runningFn && ctx.function !== "asleep") {
+  if (ws.availableThreads < 1 && ctx.function !== "asleep") {
     log(ctx, () => "Failed to run due to failed concurrency check.");
     const err = errorMessage(
       ctx,
       `Concurrent calls to Netscript functions are not allowed!
       Did you forget to await hack(), grow(), or some other
       promise-returning function?
-      Currently running: ${ws.env.runningFn} tried to run: ${ctx.function}`,
+      Tried to run: ${ctx.function}
+      ${ws.availableThreads} threads available of ${ws.scriptRef.threads}`,
       "CONCURRENCY",
     );
     killWorkerScript(ws);
@@ -364,17 +365,18 @@ function checkEnvFlags(ctx: NetscriptContext): void {
 }
 
 /** Set a timeout for performing a task, mark the script as busy in the meantime. */
-function netscriptDelay(ctx: NetscriptContext, time: number): Promise<void> {
+function netscriptDelay(ctx: NetscriptContext, time: number, threads = 1): Promise<void> {
   const ws = ctx.workerScript;
+  ws.availableThreads -= threads;
   return new Promise(function (resolve, reject) {
-    ws.delay = window.setTimeout(() => {
-      ws.delay = null;
-      ws.delayReject = undefined;
+    const timeoutID = window.setTimeout(() => {
+      delete ws.delayRejects[timeoutID];
       ws.env.runningFn = "";
+      ws.availableThreads += threads;
       if (ws.env.stopFlag) reject(new ScriptDeath(ws));
       else resolve();
     }, time);
-    ws.delayReject = reject;
+    ws.delayRejects[timeoutID] = reject;
     ws.env.runningFn = ctx.function;
   });
 }
@@ -493,7 +495,7 @@ function hack(ctx: NetscriptContext, hostname: string, manual: boolean, opts: un
       )} (t=${formatThreads(threads)})`,
   );
 
-  return helpers.netscriptDelay(ctx, hackingTime * 1000).then(function () {
+  return helpers.netscriptDelay(ctx, hackingTime * 1000, threads).then(function () {
     const hackChance = calculateHackingChance(server, Player);
     const rand = Math.random();
     let expGainedOnSuccess = calculateHackingExpGain(server, Player) * threads;

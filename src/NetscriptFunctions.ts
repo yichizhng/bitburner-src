@@ -292,7 +292,7 @@ export const ns: InternalAPI<NSFull> = {
           true,
         )} (t=${formatThreads(threads)}).`,
     );
-    return helpers.netscriptDelay(ctx, growTime * 1000).then(function () {
+    return helpers.netscriptDelay(ctx, growTime * 1000, threads).then(function () {
       const host = GetServer(ctx.workerScript.hostname);
       if (host === null) {
         throw helpers.errorMessage(ctx, `Cannot find host of WorkerScript. Hostname: ${ctx.workerScript.hostname}.`);
@@ -388,7 +388,7 @@ export const ns: InternalAPI<NSFull> = {
           true,
         )} (t=${formatThreads(threads)})`,
     );
-    return helpers.netscriptDelay(ctx, weakenTime * 1000).then(function () {
+    return helpers.netscriptDelay(ctx, weakenTime * 1000, threads).then(function () {
       const host = GetServer(ctx.workerScript.hostname);
       if (host === null) {
         throw helpers.errorMessage(ctx, `Cannot find host of WorkerScript. Hostname: ${ctx.workerScript.hostname}.`);
@@ -421,11 +421,11 @@ export const ns: InternalAPI<NSFull> = {
       return getWeakenEffect(threads, cores);
     },
   share: (ctx) => () => {
-    const threads = ctx.workerScript.scriptRef.threads;
+    const threads = ctx.workerScript.availableThreads;
     const hostname = ctx.workerScript.hostname;
     helpers.log(ctx, () => `Sharing ${threads} threads on ${hostname}.`);
     const end = startSharing(threads, helpers.getServer(ctx, hostname).cpuCores);
-    return helpers.netscriptDelay(ctx, ShareBonusTime).finally(function () {
+    return helpers.netscriptDelay(ctx, ShareBonusTime, threads).finally(function () {
       helpers.log(ctx, () => `Finished sharing ${threads} threads on ${hostname}.`);
       end();
     });

@@ -26,14 +26,11 @@ export class WorkerScript {
   /** Copy of the script's code */
   code = "";
 
-  /**
-   * Holds the timeoutID (numeric value) for whenever this script is blocked by a
-   * timed Netscript function. i.e. Holds the return value of setTimeout()
-   */
-  delay: number | null = null;
+  /** Number of threads available to run operations in this script. */
+  availableThreads: number;
 
-  /** Holds the Promise reject() function while the script is "blocked" by an async op */
-  delayReject: ((reason?: ScriptDeath) => void) | undefined = undefined;
+  /** Map from timeoutIDs to reject() functions of async operations. */
+  delayRejects: Record<number, (reason?: ScriptDeath) => void> = {};
 
   /** Stores names of all functions that have logging disabled */
   disableLogs: Record<string, boolean> = {};
@@ -81,6 +78,7 @@ export class WorkerScript {
   constructor(runningScriptObj: RunningScript, pid: number, nsFuncsGenerator?: (ws: WorkerScript) => NSFull) {
     this.name = runningScriptObj.filename;
     this.hostname = runningScriptObj.server;
+    this.availableThreads = runningScriptObj.threads;
 
     const sanitizedPid = Math.round(pid);
     if (typeof sanitizedPid !== "number" || isNaN(sanitizedPid)) {
