@@ -1,732 +1,631 @@
-import type { Board, BoardState, Neighbor, Play, PointState, SimpleBoard } from "../Types";
+const BITMASKS =
+  [-1859522833, -1739909149, -931036797, -1601624096, 857669814,
+    1819304447, 1392322075, 323843675, -362807465, -1232092001,
+    260092070, 1439385049, -249468074, -1990148517, 903990427,
+    2003321, 666241572, -1551804152, 919986533, 1416863106,
+  -985183921, 936642381, 173734385, 1721693366, 77934800, 96015055,
+    1582647486, -760826094, 1969356275, 1401284072, 480448628,
+  -1172367894, 820745004, 1626939348, 831399107, -217963708,
+    1260498195, 1415842264, -1897880285, -273553814, 1944522789,
+    599390262, 1033445011, -937107540, 1168511328, 1158173073,
+    894866539, 1807160375, -599589627, 498624852, -1271883029]
 
-import { GoValidity, GoOpponent, GoColor, GoPlayType } from "@enums";
-import { Go } from "../Go";
-import {
-  findAdjacentPointsInChain,
-  findNeighbors,
-  getArrayFromNeighbor,
-  getBoardCopy,
-  getEmptySpaces,
-  getNewBoardState,
-  isNotNullish,
-  updateCaptures,
-  updateChains,
-} from "../boardState/boardState";
+// Maximum number of playouts to use for MCGS
+const PLAYOUTS = 10000;
 
-/**
- * Determines if the given player can legally make a move at the specified coordinates.
- *
- * You cannot repeat previous board states, to prevent endless loops (superko rule)
- *
- * You cannot make a move that would remove all liberties of your own piece(s) unless it captures opponent's pieces
- *
- * You cannot make a move in an occupied space
- *
- * You cannot make a move if it is not your turn, or if the game is over
- *
- * @returns a validity explanation for if the move is legal or not
+// Hand tuned value for MCGS exploration
+const EXPLORATION_PARAMETER = 0.3;
+
+// If true, white's play in the MCGS is modified to
+// account for some AI biases
+const USE_AI_TWEAKS = true;
+
+// If true, resets boards where AI starts with [2,2]
+// and always plays [2,2] as the first move
+const RESET_FOR_TENGEN = false;
+
+/** @param {string[][] | string[]} board
+  * @param {boolean} blackToPlay */
+function zobristHash(board, blackToPlay) {
+  var x = 0;
+  for (var i = 0; i < 5; ++i) {
+    for (var j = 0; j < 5; ++j) {
+      if (board[i][j] == 'O')
+        x ^= BITMASKS[2 * (5 * j + i)];
+      if (board[i][j] == 'X')
+        x ^= BITMASKS[2 * (5 * j + i) + 1];
+    }
+  }
+  if (blackToPlay) {
+    x ^= BITMASKS[50];
+  }
+  return x;
+}
+
+/** 
+ * @param {string[][]} board
+ * @param {number[][]} liberties
+ * @param {number} x
+ * @param {number} y
+ * @param {boolean} blackToPlay
  */
-export function evaluateIfMoveIsValid(boardState: BoardState, x: number, y: number, player: GoColor, shortcut = true) {
-  const point = boardState.board[x]?.[y];
-
-  if (boardState.previousPlayer === null) {
-    return GoValidity.gameOver;
-  }
-  if (boardState.previousPlayer === player) {
-    return GoValidity.notYourTurn;
-  }
-  if (!point) {
-    return GoValidity.pointBroken;
-  }
-  if (point.color !== GoColor.empty) {
-    return GoValidity.pointNotEmpty;
-  }
-
-  // Detect if the move might be an immediate repeat (only one board of history is saved to check)
-  const possibleRepeat = boardState.previousBoards.find((board) => getColorOnBoardString(board, x, y) === player);
-
-  if (shortcut) {
-    // If the current point has some adjacent open spaces, it is not suicide. If the move is not repeated, it is legal
-    const liberties = findAdjacentLibertiesForPoint(boardState.board, x, y);
-    const hasLiberty = liberties.north || liberties.east || liberties.south || liberties.west;
-    if (!possibleRepeat && hasLiberty) {
-      return GoValidity.valid;
-    }
-
-    // If a connected friendly chain has more than one liberty, the move is not suicide. If the move is not repeated, it is legal
-    const neighborChainLibertyCount = findMaxLibertyCountOfAdjacentChains(boardState, x, y, player);
-    if (!possibleRepeat && neighborChainLibertyCount > 1) {
-      return GoValidity.valid;
-    }
-
-    // If there is any neighboring enemy chain with only one liberty, and the move is not repeated, it is valid,
-    // because it would capture the enemy chain and free up some liberties for itself
-    const potentialCaptureChainLibertyCount = findMinLibertyCountOfAdjacentChains(
-      boardState.board,
-      x,
-      y,
-      player === GoColor.black ? GoColor.white : GoColor.black,
-    );
-    if (!possibleRepeat && potentialCaptureChainLibertyCount < 2) {
-      return GoValidity.valid;
-    }
-
-    // If there is no direct liberties for the move, no captures, and no neighboring friendly chains with multiple liberties,
-    // the move is not valid because it would suicide the piece
-    if (!hasLiberty && potentialCaptureChainLibertyCount >= 2 && neighborChainLibertyCount <= 1) {
-      return GoValidity.noSuicide;
+function addMove(board, liberties, x, y, blackToPlay) {
+  // TODO: also update the Zobrist hash and liberties here.
+  if (board[x][y] != '.') return null;
+  /** @type {[number, number][]} */
+  let toCapture = [];
+  let legal = false;
+  for (let [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    switch (board[x + dx]?.[y + dy]) {
+      case '.':
+        legal = true;
+        break;
+      case 'X':
+        if (blackToPlay) {
+          if (liberties[x + dx][y + dy] > 1) {
+            legal = true;
+          }
+        } else {
+          if (liberties[x + dx][y + dy] == 1) {
+            legal = true;
+            toCapture.push([x + dx, y + dy]);
+          }
+        }
+        break;
+      case 'O':
+        if (blackToPlay) {
+          if (liberties[x + dx][y + dy] == 1) {
+            legal = true;
+            toCapture.push([x + dx, y + dy]);
+          }
+        } else {
+          if (liberties[x + dx][y + dy] > 1) {
+            legal = true;
+          }
+        }
     }
   }
-
-  // If the move has been played before and is not obviously illegal, we have to actually play it out to determine
-  // if it is a repeated move, or if it is a valid move
-  const evaluationBoard = evaluateMoveResult(boardState.board, x, y, player, true);
-  if (evaluationBoard[x]?.[y]?.color !== player) {
-    return GoValidity.noSuicide;
-  }
-  if (possibleRepeat && boardState.previousBoards.length) {
-    const simpleEvalBoard = boardStringFromBoard(evaluationBoard);
-    if (boardState.previousBoards.includes(simpleEvalBoard)) {
-      return GoValidity.boardRepeated;
+  if (!legal) return null;
+  let bc = board.map(x => [...x]);
+  bc[x][y] = blackToPlay ? 'X' : 'O';
+  for (let i = 0; i < toCapture.length; ++i) {
+    let [xx, yy] = toCapture[i];
+    bc[xx][yy] = '.';
+    for (let [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (bc[xx + dx]?.[yy + dy] == (blackToPlay ? 'O' : 'X')) {
+        bc[xx + dx][yy + dy] = '.';
+        toCapture.push([xx + dx, yy + dy]);
+      }
     }
   }
+  return bc;
+}
 
-  return GoValidity.valid;
+/** @param {string[][]} position */
+function getLibertiesLite(position) {
+  let liberties = position.map(x => x.map(() => -1));
+  for (let x = 0; x < 5; ++x) {
+    for (let y = 0; y < 5; ++y) {
+      if (liberties[x][y] == -1 && (position[x][y] == 'X' || position[x][y] == 'O')) {
+        let l = 0;
+        let seen = [];
+        let group = [[x, y]];
+        seen[10 * x + y] = 1;
+        for (let i = 0; i < group.length; ++i) {
+          for (let [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+            let xx = group[i][0] + dx, yy = group[i][1] + dy;
+            if (seen[10 * xx + yy]) continue;
+            seen[10 * xx + yy] = 1;
+            if (position[xx]?.[yy] == position[x][y]) {
+              group.push([xx, yy])
+            } else if (position[xx]?.[yy] == '.') {
+              l++;
+            }
+          }
+        }
+        for (let [xx, yy] of group) {
+          liberties[xx][yy] = l;
+        }
+      }
+    }
+  }
+  return liberties;
 }
 
 /**
- * Create a new evaluation board and play out the results of the given move on the new board
- * @returns the evaluation board
+ * @param {string[][]} position
+ * @param {boolean} blackToPlay
+ * @param {Set<number>} history
  */
-export function evaluateMoveResult(board: Board, x: number, y: number, player: GoColor, resetChains = false): Board {
-  const evaluationBoard = getBoardCopy(board);
-  const point = evaluationBoard[x]?.[y];
-  if (!point) return board;
-
-  point.color = player;
-
-  const neighbors = getArrayFromNeighbor(findNeighbors(board, x, y));
-  const chainIdsToUpdate = [point.chain, ...neighbors.map((point) => point.chain)];
-  resetChainsById(evaluationBoard, chainIdsToUpdate);
-  updateCaptures(evaluationBoard, player, resetChains);
-  return evaluationBoard;
+function fastPlayout(position, blackToPlay, history, ns) {
+  let lastPassed = false;
+  for (let i = 0; i < 30; ++i) {
+    // pick a non-dumb move at random, defaulting to pass
+    // (a move is dumb if it is self-atari or fills in an eye for no reason)
+    let np = position.map(x => [...x]);
+    let liberties = getLibertiesLite(position);
+    let moves = [];
+    for (let x = 0; x < 5; ++x) {
+      for (let y = 0; y < 5; ++y) {
+        let fillsEye = true;
+        for (let [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+          if (liberties[x + dx]?.[y + dy] == 1) {
+            fillsEye = false;
+          }
+          if (position[x + dx]?.[y + dy] == '.') {
+            fillsEye = false; break;
+          }
+          if (position[x + dx]?.[y + dy] == 'O') {
+            if (blackToPlay) {
+              fillsEye = false; break;
+            }
+          }
+          if (position[x + dx]?.[y + dy] == 'X') {
+            if (!blackToPlay) {
+              fillsEye = false; break;
+            }
+          }
+        }
+        if (fillsEye) continue;
+        let nc = addMove(position, liberties, x, y, blackToPlay);
+        if (!nc) continue;
+        let hash = zobristHash(nc, false);
+        if (history.has(hash)) continue;
+        moves.push(nc);
+      }
+    }
+    if (moves.length) {
+      lastPassed = false;
+      np = moves[Math.floor(Math.random() * moves.length)]
+    } else {
+      if (lastPassed) break;
+      lastPassed = true;
+    }
+    position = np;
+    blackToPlay = !blackToPlay;
+    history.add(zobristHash(position, false));
+  }
+  return scoreTerminal(position, false);
 }
 
-export function getControlledSpace(board: Board) {
-  const chains = getAllChains(board);
-  const length = board[0].length;
-  const whiteControlledEmptyNodes = getAllPotentialEyes(board, chains, GoColor.white, length * 2)
-    .map((eye) => eye.chain)
-    .flat();
-  const blackControlledEmptyNodes = getAllPotentialEyes(board, chains, GoColor.black, length * 2)
-    .map((eye) => eye.chain)
-    .flat();
-
-  const ownedPointGrid = Array.from({ length }, () => Array.from({ length }, () => GoColor.empty));
-  whiteControlledEmptyNodes.forEach((node) => {
-    ownedPointGrid[node.x][node.y] = GoColor.white;
-  });
-  blackControlledEmptyNodes.forEach((node) => {
-    ownedPointGrid[node.x][node.y] = GoColor.black;
-  });
-
-  return ownedPointGrid;
+function moveName(x, y) {
+  return 'ABCDE'[x] + (y + 1);
 }
 
 /**
-  Clear the chain and liberty data of all points in the given chains
+ * @param {string[][]} board
  */
-const resetChainsById = (board: Board, chainIds: string[]) => {
-  for (const column of board) {
-    for (const point of column) {
-      if (!point || !chainIds.includes(point.chain)) continue;
-      point.chain = "";
-      point.liberties = [];
+function countWhiteEyes(board) {
+  let eyeCount = 0;
+  let checked = board.map(x=>x.map(()=>false));
+  for (let x = 0; x < 5; ++x) {
+    for (let y = 0; y < 5; ++y) {
+      let chainID = 5*x + y + 1;
+      if (checked[x][y] || board[x][y] != 'O') continue;
+      let chain = [[x,y]];
+      let liberties = [];
+      for (let i = 0; i < chain.length; ++i) {
+        for (let [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+          if (checked[x+dx]?.[y+dy] !== false) continue;
+          if (board[x+dx]?.[y+dy] == 'O') {
+            chain.push([x+dx,y+dy]);
+            checked[x+dx][y+dy] = chainID;
+          } else if (board[x+dx]?.[y+dy] == '.') {
+            if (checked[x+dx][y+dy]) continue;
+            // if it was already checked by another chain, it
+            // isn't an eye
+            liberties.push([x+dx,y+dy]);
+          }
+        }
+      }
+      for (let [x,y] of liberties) {
+        let eye = [[x,y]];
+        let isEye = true;
+        for (let i = 0; i < eye.length; ++i) {
+          for (let [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+            if (checked[x+dx]?.[y+dy] !== false) continue;
+            if (board[x+dx]?.[y+dy] == 'X') isEye = false;
+            if (board[x+dx]?.[y+dy] == '.') {
+              checked[x+dx][y+dy] = chainID;
+              eye.push([x+dx,y+dy]);
+            }
+            if (board[x+dx]?.[y+dy] == 'O') {
+              // the AI doesn't believe in shared eyes (okay, well, it
+              // does in one case, but that case basically doesn't come up)
+              if (checked[x+dx][y+dy] != chainID) isEye = false;
+            }
+          }
+        }
+        if (isEye) eyeCount++;
+      }
+
     }
   }
-};
-
-/**
- * For a potential move, determine what the liberty of the point would be if played, by looking at adjacent empty nodes
- * as well as the remaining liberties of neighboring friendly chains
- */
-export function findEffectiveLibertiesOfNewMove(board: Board, x: number, y: number, player: GoColor) {
-  const friendlyChains = getAllChains(board).filter((chain) => chain[0].color === player);
-  const neighbors = findAdjacentLibertiesAndAlliesForPoint(board, x, y, player);
-  const neighborPoints = [neighbors.north, neighbors.east, neighbors.south, neighbors.west].filter(isNotNullish);
-  // Get all chains that the new move will connect to
-  const allyNeighbors = neighborPoints.filter((neighbor) => neighbor.color === player);
-  const allyNeighborChainLiberties = allyNeighbors
-    .map((neighbor) => {
-      const chain = friendlyChains.find((chain) => chain[0].chain === neighbor.chain);
-      return chain?.[0]?.liberties ?? null;
-    })
-    .flat()
-    .filter(isNotNullish);
-
-  // Get all empty spaces that the new move connects to that aren't already part of friendly liberties
-  const directLiberties = neighborPoints.filter((neighbor) => neighbor.color === GoColor.empty);
-
-  const allLiberties = [...directLiberties, ...allyNeighborChainLiberties];
-
-  // filter out duplicates, and starting point
-  return allLiberties
-    .filter(
-      (liberty, index) =>
-        allLiberties.findIndex((neighbor) => liberty.x === neighbor.x && liberty.y === neighbor.y) === index,
-    )
-    .filter((liberty) => liberty.x !== x || liberty.y !== y);
+  return eyeCount;
 }
 
-/**
- * Find the number of open spaces that are connected to chains adjacent to a given point, and return the maximum
- */
-export function findMaxLibertyCountOfAdjacentChains(boardState: BoardState, x: number, y: number, player: GoColor) {
-  const neighbors = findAdjacentLibertiesAndAlliesForPoint(boardState.board, x, y, player);
-  const friendlyNeighbors = [neighbors.north, neighbors.east, neighbors.south, neighbors.west]
-    .filter(isNotNullish)
-    .filter((neighbor) => neighbor.color === player);
+class MCGSNode {
+  /**
+   * @param {string[][]} board
+   * @param {boolean} blackToPlay
+   * @param {Map<number, MCGSNode>} map
+   * @param {Set<number>} history hashes of previous game states, used for superko detection
+   */
+  constructor(board, blackToPlay, map, history) {
+    this.board = board;
+    this.blackToPlay = blackToPlay;
+    this.hash = zobristHash(board, blackToPlay);
 
-  return friendlyNeighbors.reduce((max, neighbor) => Math.max(max, neighbor?.liberties?.length ?? 0), 0);
-}
+    let liberties = getLibertiesLite(board);
 
-/**
- * Find the number of open spaces that are connected to chains adjacent to a given point, and return the minimum
- */
-export function findMinLibertyCountOfAdjacentChains(board: Board, x: number, y: number, player: GoColor) {
-  const chain = findEnemyNeighborChainWithFewestLiberties(board, x, y, player);
-  return chain?.[0]?.liberties?.length ?? 99;
-}
+    /** @type [number, number, string[][], [number,number]|null, number, MCGSNode|null][] */
+    this.children = [[this.hash ^ BITMASKS[50], 0, board, null, 1, null]];
 
-export function findEnemyNeighborChainWithFewestLiberties(board: Board, x: number, y: number, player: GoColor) {
-  const chains = getAllChains(board);
-  const neighbors = findAdjacentLibertiesAndAlliesForPoint(board, x, y, player);
-  const friendlyNeighbors = [neighbors.north, neighbors.east, neighbors.south, neighbors.west]
-    .filter(isNotNullish)
-    .filter((neighbor) => neighbor.color === player);
+    let whiteEyes = (USE_AI_TWEAKS && !blackToPlay) && countWhiteEyes(board);
+    for (let x = 0; x < 5; ++x) {
+      for (let y = 0; y < 5; ++y) {
+        let np = addMove(board, liberties, x, y, blackToPlay);
+        if (!np) continue;
+        let hash = zobristHash(np, !blackToPlay);
+        let weight = 1;
+        if (USE_AI_TWEAKS) {
+          if (!blackToPlay) {
+            let isatari = false;
+            let iscapture = false;
+            let isdefend = false;
+            let emptycount = 0;
+            let neighborliberties = 1;
+            for (let [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+              if (board[x + dx]?.[y + dy] == 'X') {
+                if (liberties[x+dx][y+dy] == 2) {
+                  isatari = true;
+                } else if (liberties[x+dx][y+dy] == 1) {
+                  iscapture = true;
+                }
+              }
+              if (board[x + dx]?.[y + dy] == 'O') {
+                if (liberties[x+dx][y+dy] == 1) {
+                  isdefend = true;
+                } else if (liberties[x+dx]?.[y+dy] > neighborliberties) {
+                  neighborliberties = liberties[x+dx][y+dy];
+                }
+              }
+              if (board[x + dx]?.[y + dy] == '.') {
+                emptycount++;
+              }
+            }
+            let makesEye = false;
+            if (!iscapture) {
+              let nb = board.map(x=>[...x]);
+              nb[x][y] = 'O';
+              let newWhiteEyes = countWhiteEyes(nb);
+              if (newWhiteEyes > whiteEyes) makesEye = true;
+            }
 
-  const minimumLiberties = friendlyNeighbors.reduce(
-    (min, neighbor) => Math.min(min, neighbor?.liberties?.length ?? 0),
-    friendlyNeighbors?.[0]?.liberties?.length ?? 99,
-  );
-
-  const chainId = friendlyNeighbors.find((neighbor) => neighbor?.liberties?.length === minimumLiberties)?.chain;
-  return chains.find((chain) => chain[0].chain === chainId);
-}
-
-/**
- * Returns a list of points that are valid moves for the given player
- */
-export function getAllValidMoves(boardState: BoardState, player: GoColor) {
-  return getEmptySpaces(boardState.board).filter(
-    (point) => evaluateIfMoveIsValid(boardState, point.x, point.y, player) === GoValidity.valid,
-  );
-}
-
-/**
-  Find all empty point groups where either:
-  * all of its immediate surrounding player-controlled points are in the same continuous chain, or
-  * it is completely surrounded by some single larger chain and the edge of the board
-
-  Eyes are important, because a chain of pieces cannot be captured if it fully surrounds two or more eyes.
- */
-export function getAllEyesByChainId(board: Board, player: GoColor) {
-  const allChains = getAllChains(board);
-  const eyeCandidates = getAllPotentialEyes(board, allChains, player);
-  const eyes: { [s: string]: PointState[][] } = {};
-
-  eyeCandidates.forEach((candidate) => {
-    if (candidate.neighbors.length === 0) {
-      return;
+            if (iscapture) {
+              weight = 100;
+            } else if (isdefend && neighborliberties + emptycount > 2) {
+              weight = 80;
+            } else if (makesEye) {
+              weight = 60;
+            } else if (isatari && neighborliberties + emptycount > 2) {
+              weight = 40;
+            }          }
+        }
+        this.children.push([hash, 0, np, [x, y], weight, null]);
+      }
     }
+    map.set(this.hash, this);
 
-    // If only one chain surrounds the empty space, it is a true eye
-    if (candidate.neighbors.length === 1) {
-      const neighborChainID = candidate.neighbors[0][0].chain;
-      eyes[neighborChainID] = eyes[neighborChainID] || [];
-      eyes[neighborChainID].push(candidate.chain);
-      return;
+    // result of the playout rooted at this position
+    this.U = fastPlayout(this.board, this.blackToPlay, history);
+
+    // Playouts going though this node
+    this.N = 1;
+
+    // Expected utility of playouts going through this node
+    this.Q = this.U;
+
+    // Total utility of playouts going through this node
+    this.S = this.U;
+
+    // Total square of utility of playouts going through this node
+    this.SS = this.U ** 2;
+  }
+
+  getcPUCT() {
+    return (20 + this.N * Math.max(0.1, Math.sqrt(
+      (this.SS) / (this.N)
+      - ((this.S) / (this.N)) ** 2))) / (this.N + 1);
+  }
+}
+
+/** 
+ * @param {string[] | string[][]} board 
+ * @param {number[]} seen_hashes
+ */
+function getMoves(board, seen_hashes = []) {
+  let b = board.map(x => [...x]);
+
+  let map = new Map();
+  let root = new MCGSNode(b, true, map, new Set([seen_hashes]));
+  for (let i = 0; i < PLAYOUTS; ++i) {
+    if (i % 2000 == 1999) {
+      let c = root.children.reduce((x, y) => y[1] > x[1] ? y : x);
+      if (c[1] >= 0.5 * PLAYOUTS) {
+        break;
+      }
+      if (root.Q > 20 || root.Q < 4) break;
+      if (root.getcPUCT() < 2) break;
     }
+    let seen = new Set(seen_hashes);
+    seen.add(zobristHash(b, false));
+    let path = [root];
+    let nn = 0;  // result of playout
+    let lastPassed = false;
+    while (true) {
+      let ln = path.at(-1);
+      let bestScore = -Infinity;
+      let bestCount = 0;
+      let nh = ln.children[0];
+      for (let c of ln.children) {
+        if (seen.has(zobristHash(c[2],false))) {
+          if (c[3] == null) {
+            if (lastPassed) {
+            ln.DP ??= ['t', 0, null, null, 1, scoreTerminal(ln.board, true)];
+            let score = (ln.blackToPlay ? 1 : -1) * ln.DP[5];
+            // no exploration factor because we know terminal nodes have no variance
+            if (score > bestScore) {
+              bestScore = score;
+              bestCount = 1;
+              nn = ln.DP[5];
+              nh = ln.DP;
+            }
+            continue;
+            }
+          } else {
+          continue;
+          }
+        }
+        // eagerly update cached child pointer
+        c[5] ??= map.get(c[0]);
+        let score =
+          ((ln.blackToPlay ? 1 : -1) *
+            (c[5]?.Q ?? ln.Q) +
+            (EXPLORATION_PARAMETER *
+            (c[5]?.getcPUCT?.() ?? 25) // child node's variance
+              * Math.sqrt(ln.N) / (1 + c[1])));
+        if (USE_AI_TWEAKS && !ln.blackToPlay) {
+          if (c[4] < 1) continue;
+          score += c[4];
+        }
+        if (score > bestScore) {
+          bestScore = score;
+          bestCount = 1;
+          nh = c;
+        } else if (score == bestScore) {
+          bestCount++;
+          if (Math.random() * bestCount < 1) {
+            nh = c;
+          }
+        }
+      }
 
-    // If any chain fully encircles the empty space (even if there are other chains encircled as well), the eye is true
-    const neighborsEncirclingEye = findNeighboringChainsThatFullyEncircleEmptySpace(
-      board,
-      candidate.chain,
-      candidate.neighbors,
-      allChains,
-    );
-    neighborsEncirclingEye.forEach((neighborChain) => {
-      const neighborChainID = neighborChain[0].chain;
-      eyes[neighborChainID] = eyes[neighborChainID] || [];
-      eyes[neighborChainID].push(candidate.chain);
+      // Update node statistics
+      ln.N++;
+      nh[1]++;
+      lastPassed = !nh[3];
+      if (typeof nh[0] == 'string') {
+        nn = nh[5];
+        break;
+      }
+      seen.add(zobristHash(nh[2], false));
+      nh[5] ??= map.get(nh[0]);
+      if (nh[5]) {
+        path.push(nh[5]);
+      } else {
+        nh[5] = new MCGSNode(nh[2], !ln.blackToPlay, map, seen);
+        nn = nh[5].U;
+        break;
+      }
+    }
+    // See https://github.com/lightvector/KataGo/blob/master/docs/GraphSearch.md
+    for (let i = path.length; i-- > 0;) {
+      let node = path[i];
+      let s = 0;
+      for (let c of node.children) {
+        s += c[1] * (map.get(c[0])?.Q ?? 0);
+      }
+      if (node.DP) {
+        s += node.DP[1] * node.DP[5];
+      }
+      node.Q = (node.U + s) / node.N;
+      node.S += nn;
+      node.SS += nn ** 2;
+    }
+  }
+  if (root.DP) {
+    // white passed last move; DP replaces the pass node
+    root.children[0] = root.DP;
+  }
+  let children = root.children.toSorted((x, y) => y[1] - x[1]);
+  for (let c of children) {
+    c[2] = c[5]?.Q ?? 0;
+  }
+  /*
+  let refutation = children[0][5]?.children;
+  if (refutation) {
+    refutation.sort((x,y) => y[1] - x[1]);
+    for (let r of refutation) {
+      console.log(r[3] ? moveName(...r[3]) : 'pass', r[1]);
+    }
+  }
+  //*/
+  return [root.Q, root.getcPUCT(), children];
+}
+
+/** 
+ * @param {string[][]} position 
+ * @param {boolean} immediate if true, ignores liveness analysis
+ * */
+function scoreTerminal(position, immediate) {
+  let bl = 0, wl = 0;
+  let wc = 0, bc = 0, ec = 0;
+  for (let x = 0; x < 5; ++x) {
+    for (let y = 0; y < 5; ++y) {
+      if (position[x][y] == 'X') {
+        bc++;
+      }
+      if (position[x][y] == 'O') {
+        wc++;
+      }
+      if (position[x][y] == '.') {
+        let bn = false, wn = false;
+        for (let [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (position[x + dx]?.[y + dy] == 'X') {
+            bn = true;
+          }
+          if (position[x + dx]?.[y + dy] == 'O') {
+            wn = true;
+          }
+        }
+        if (bn) {
+          if (wn) ec++;
+          else bl++;
+        } else {
+          if (wn) wl++;
+          else ec++;
+        }
+      }
+    }
+  }
+  if (immediate) {
+    return bc + bl;
+  }
+
+  if (wl == bl) return bc + bl;  // we assume it's seki or something
+  if (wl >= 2 && bl >= 2) return bc + bl;  // same
+  if (wl > bl) return 0;  // big loss
+  return wc + ec + bc + bl + wl;  // big win
+}
+
+/** @param {NS} ns */
+export async function main(ns) {
+  ns.disableLog('asleep');
+  ns.clearLog();
+
+  if (!Worker) {
+    ns.print('Please get a real browser');
+    ns.exit();
+  }
+
+  let worker_script = ns.read(ns.getScriptName()).split('export')[0] + `
+  onmessage = function(e) {
+    postMessage(getMoves(...e.data));
+  }`;
+  let blob = new Blob([worker_script], { type: 'text/javascript' });
+  let url = URL.createObjectURL(blob);
+  let worker = new Worker(url);
+  let resolve;
+  worker.onmessage = function (e) {
+    resolve?.(e.data);
+  }
+  ns.atExit(() => worker.terminate(), 'worker');
+  let getMoves = function (d, m) {
+    return new Promise((res, rej) => {
+      ns.atExit(rej, 'worker_promise')
+      resolve = res;
+      worker.postMessage([d, m]);
     });
-  });
+  }
 
-  return eyes;
-}
+  /* testing code
+  ns.clearLog()
+  ns.ui.setTailTitle('Analysis mode')
+  // analyze current game state
+  // let seen = ns.go.getMoveHistory().map(x=>zobristHash(x,false));
+  // let [q,s,moves] = await gm(ns.go.getBoardState(), seen, false);
+  
+  let bord = ["XXX..",".XXXX","XXOO#","OOO.O","O.OOO"];
+  let seen = [];
+  let [q,s,moves] = await getMoves(bord, seen);
 
-/**
- * Get a list of all eyes, grouped by the chain they are adjacent to
- */
-export function getAllEyes(board: Board, player: GoColor, eyesObject?: { [s: string]: PointState[][] }) {
-  const eyes = eyesObject ?? getAllEyesByChainId(board, player);
-  return Object.keys(eyes).map((key) => eyes[key]);
-}
+  for (let [h, n, q, m] of moves) {
+    ns.print(m ? moveName(...m) : 'pass', ' N = ', n, ' Q = ', q);
+    //if (seen.includes(h) && m) {
+    //  ns.print('illegal due to superko rule')
+    //}
+  }
+  return;
+  //*/
 
-/**
-  Find all empty spaces completely surrounded by a single player color.
-  For each player chain number, add any empty space chains that are completely surrounded by a single player's color to
-   an array at that chain number's index.
- */
-export function getAllPotentialEyes(board: Board, allChains: PointState[][], player: GoColor, _maxSize?: number) {
-  const nodeCount = board.map((row) => row.filter((p) => p)).flat().length;
-  const maxSize = _maxSize ?? Math.min(nodeCount * 0.4, 11);
-  const emptyPointChains = allChains.filter((chain) => chain[0].color === GoColor.empty);
-  const eyeCandidates: { neighbors: PointState[][]; chain: PointState[]; id: string }[] = [];
-
-  emptyPointChains
-    .filter((chain) => chain.length <= maxSize)
-    .forEach((chain) => {
-      const neighboringChains = getAllNeighboringChains(board, chain, allChains);
-
-      const hasWhitePieceNeighbor = neighboringChains.find(
-        (neighborChain) => neighborChain[0]?.color === GoColor.white,
-      );
-      const hasBlackPieceNeighbor = neighboringChains.find(
-        (neighborChain) => neighborChain[0]?.color === GoColor.black,
-      );
-
-      // Record the neighbor chains of the eye candidate empty chain, if all of its neighbors are the same color piece
-      if (
-        (hasWhitePieceNeighbor && !hasBlackPieceNeighbor && player === GoColor.white) ||
-        (!hasWhitePieceNeighbor && hasBlackPieceNeighbor && player === GoColor.black)
-      ) {
-        eyeCandidates.push({
-          neighbors: neighboringChains,
-          chain: chain,
-          id: chain[0].chain,
-        });
+  let start = Date.now();
+  let wins = 0;
+  for (let i = 0; i < 1000; ++i) {
+    let lastMove = {};
+    ns.go.resetBoardState('Illuminati', 5);
+    if (RESET_FOR_TENGEN) {
+      while (ns.go.getBoardState()[2][2] != '.') {
+        ns.go.resetBoardState('Illuminati', 5);
       }
-    });
-
-  return eyeCandidates;
-}
-
-/**
- *  For each chain bordering an eye candidate:
- *    remove all other neighboring chains. (replace with empty points)
- *    check if the eye candidate is a simple true eye now
- *       If so, the original candidate is a true eye.
- */
-function findNeighboringChainsThatFullyEncircleEmptySpace(
-  board: Board,
-  candidateChain: PointState[],
-  neighborChainList: PointState[][],
-  allChains: PointState[][],
-) {
-  const boardMax = board[0].length - 1;
-  const candidateSpread = findFurthestPointsOfChain(candidateChain);
-  return neighborChainList.filter((neighborChain, index) => {
-    // If the chain does not go far enough to surround the eye in question, don't bother building an eval board
-    const neighborSpread = findFurthestPointsOfChain(neighborChain);
-
-    const couldWrapNorth =
-      neighborSpread.north > candidateSpread.north ||
-      (candidateSpread.north === boardMax && neighborSpread.north === boardMax);
-    const couldWrapEast =
-      neighborSpread.east > candidateSpread.east ||
-      (candidateSpread.east === boardMax && neighborSpread.east === boardMax);
-    const couldWrapSouth =
-      neighborSpread.south < candidateSpread.south || (candidateSpread.south === 0 && neighborSpread.south === 0);
-    const couldWrapWest =
-      neighborSpread.west < candidateSpread.west || (candidateSpread.west === 0 && neighborSpread.west === 0);
-
-    if (!couldWrapNorth || !couldWrapEast || !couldWrapSouth || !couldWrapWest) {
-      return false;
+      lastMove = await ns.go.makeMove(2, 2);
     }
-
-    const evaluationBoard = getBoardCopy(board);
-    const examplePoint = candidateChain[0];
-    const otherChainNeighborPoints = removePointAtIndex(neighborChainList, index).flat().filter(isNotNullish);
-    otherChainNeighborPoints.forEach((point) => {
-      const pointToEdit = evaluationBoard[point.x]?.[point.y];
-      if (pointToEdit) {
-        pointToEdit.color = GoColor.empty;
+    let prevboard, prevq = 0;
+    while (lastMove.type != 'gameOver') {
+      if (lastMove.type == 'pass') {
+        let {whiteScore, komi} = ns.go.getGameState();
+        if (whiteScore == komi) {
+          await ns.go.passTurn();
+          break;
+        }
       }
-    });
-    updateChains(evaluationBoard);
-    const newChains = getAllChains(evaluationBoard);
-    const newChainID = evaluationBoard[examplePoint.x]?.[examplePoint.y]?.chain;
-    const chain = newChains.find((chain) => chain[0].chain === newChainID) || [];
-    const newNeighborChains = getAllNeighboringChains(board, chain, allChains);
+      let seen = ns.go.getMoveHistory().map((x, i) => zobristHash(x, false));
 
-    return newNeighborChains.length === 1;
-  });
-}
-
-/**
- * Determine the furthest that a chain extends in each of the cardinal directions
- */
-function findFurthestPointsOfChain(chain: PointState[]) {
-  return chain.reduce(
-    (directions, point) => {
-      if (point.y > directions.north) {
-        directions.north = point.y;
+      let q, s, moves;
+      try {
+        [q, s, moves] = await getMoves(ns.go.getBoardState(), seen);
+      } catch {
+        return;
       }
-      if (point.y < directions.south) {
-        directions.south = point.y;
+      ns.print('Q: ', q, ' S: ', s);
+      let moved = false;
+      let passq = 0;
+      if (q < prevq - 2) {
+        ns.tprint('blunder detected');
+        ns.tprint(prevboard);
+        ns.tprint(ns.go.getBoardState())
       }
-      if (point.x > directions.east) {
-        directions.east = point.x;
-      }
-      if (point.x < directions.west) {
-        directions.west = point.x;
-      }
-
-      return directions;
-    },
-    {
-      north: chain[0].y,
-      east: chain[0].x,
-      south: chain[0].y,
-      west: chain[0].x,
-    },
-  );
-}
-
-/**
- * Removes an element from an array at the given index
- */
-function removePointAtIndex(arr: PointState[][], index: number) {
-  const newArr = [...arr];
-  newArr.splice(index, 1);
-  return newArr;
-}
-
-/**
- * Get all player chains that are adjacent / touching the current chain
- */
-export function getAllNeighboringChains(board: Board, chain: PointState[], allChains: PointState[][]) {
-  const playerNeighbors = getPlayerNeighbors(board, chain);
-
-  const neighboringChains = playerNeighbors.reduce(
-    (neighborChains, neighbor) =>
-      neighborChains.add(allChains.find((chain) => chain[0].chain === neighbor.chain) || []),
-    new Set<PointState[]>(),
-  );
-
-  return [...neighboringChains];
-}
-
-/**
- * Gets all points that have player pieces adjacent to the given point
- */
-export function getPlayerNeighbors(board: Board, chain: PointState[]) {
-  return getAllNeighbors(board, chain).filter((neighbor) => neighbor && neighbor.color !== GoColor.empty);
-}
-
-/**
- * Gets all points adjacent to the given point
- */
-export function getAllNeighbors(board: Board, chain: PointState[]) {
-  const allNeighbors = chain.reduce((chainNeighbors: Set<PointState>, point: PointState) => {
-    getArrayFromNeighbor(findNeighbors(board, point.x, point.y))
-      .filter((neighborPoint) => !isPointInChain(neighborPoint, chain))
-      .forEach((neighborPoint) => chainNeighbors.add(neighborPoint));
-    return chainNeighbors;
-  }, new Set<PointState>());
-  return [...allNeighbors];
-}
-
-/**
- * Determines if chain has a point that matches the given coordinates
- */
-export function isPointInChain(point: PointState, chain: PointState[]) {
-  return !!chain.find((chainPoint) => chainPoint.x === point.x && chainPoint.y === point.y);
-}
-
-/**
- * Finds all groups of connected pieces, or empty space groups
- */
-export function getAllChains(board: Board): PointState[][] {
-  const chains: { [s: string]: PointState[] } = {};
-
-  for (let x = 0; x < board.length; x++) {
-    for (let y = 0; y < board[x].length; y++) {
-      const point = board[x]?.[y];
-      // If the current chain is already analyzed, skip it
-      if (!point || point.chain === "") {
+      prevboard = ns.go.getBoardState();
+      prevq = q;
+      // sweeps a bug under the carpet (fails to recognize some moves as illegal sometimes?)
+      if (q < 2) {
+        lastMove = await ns.go.passTurn();
         continue;
       }
-
-      chains[point.chain] = chains[point.chain] || [];
-      chains[point.chain].push(point);
-    }
-  }
-
-  return Object.keys(chains).map((key) => chains[key]);
-}
-
-/**
- * Find any group of stones with no liberties (who therefore are to be removed from the board)
- */
-export function findAllCapturedChains(chainList: PointState[][], playerWhoMoved: GoColor) {
-  const opposingPlayer = playerWhoMoved === GoColor.white ? GoColor.black : GoColor.white;
-  const enemyChainsToCapture = findCapturedChainOfColor(chainList, opposingPlayer);
-
-  if (enemyChainsToCapture.length) {
-    return enemyChainsToCapture;
-  }
-
-  const friendlyChainsToCapture = findCapturedChainOfColor(chainList, playerWhoMoved);
-  if (friendlyChainsToCapture.length) {
-    return friendlyChainsToCapture;
-  }
-}
-
-function findCapturedChainOfColor(chainList: PointState[][], playerColor: GoColor) {
-  return chainList.filter((chain) => chain?.[0].color === playerColor && chain?.[0].liberties?.length === 0);
-}
-
-/**
- * Find all empty points adjacent to any piece in a given chain
- */
-export function findLibertiesForChain(board: Board, chain: PointState[]): PointState[] {
-  return getAllNeighbors(board, chain).filter((neighbor) => neighbor && neighbor.color === GoColor.empty);
-}
-
-/**
- * Find all empty points adjacent to any piece in the chain that a given point belongs to
- */
-export function findChainLibertiesForPoint(board: Board, x: number, y: number): PointState[] {
-  const chain = findAdjacentPointsInChain(board, x, y);
-  return findLibertiesForChain(board, chain);
-}
-
-/**
- * Returns an object that includes which of the cardinal neighbors are empty
- * (adjacent 'liberties' of the current piece )
- */
-export function findAdjacentLibertiesForPoint(board: Board, x: number, y: number): Neighbor {
-  const neighbors = findNeighbors(board, x, y);
-
-  const hasNorthLiberty = neighbors.north && neighbors.north.color === GoColor.empty;
-  const hasEastLiberty = neighbors.east && neighbors.east.color === GoColor.empty;
-  const hasSouthLiberty = neighbors.south && neighbors.south.color === GoColor.empty;
-  const hasWestLiberty = neighbors.west && neighbors.west.color === GoColor.empty;
-
-  return {
-    north: hasNorthLiberty ? neighbors.north : null,
-    east: hasEastLiberty ? neighbors.east : null,
-    south: hasSouthLiberty ? neighbors.south : null,
-    west: hasWestLiberty ? neighbors.west : null,
-  };
-}
-
-/**
- * Returns an object that includes which of the cardinal neighbors are either empty or contain the
- * current player's pieces. Used for making the connection map on the board
- */
-export function findAdjacentLibertiesAndAlliesForPoint(
-  board: Board,
-  x: number,
-  y: number,
-  _player?: GoColor,
-): Neighbor {
-  const currentPoint = board[x]?.[y];
-  const player = _player || (!currentPoint || currentPoint.color === GoColor.empty ? undefined : currentPoint.color);
-  const adjacentLiberties = findAdjacentLibertiesForPoint(board, x, y);
-  const neighbors = findNeighbors(board, x, y);
-
-  return {
-    north: adjacentLiberties.north || neighbors.north?.color === player ? neighbors.north : null,
-    east: adjacentLiberties.east || neighbors.east?.color === player ? neighbors.east : null,
-    south: adjacentLiberties.south || neighbors.south?.color === player ? neighbors.south : null,
-    west: adjacentLiberties.west || neighbors.west?.color === player ? neighbors.west : null,
-  };
-}
-
-/**
- * Retrieves a simplified version of the board state.
- * "X" represents black pieces, "O" white, "." empty points, and "#" offline nodes.
- *
- * For example, a 5x5 board might look like this:
- * ```
- * [
- *   "XX.O.",
- *   "X..OO",
- *   ".XO..",
- *   "XXO..",
- *   ".XOO.",
- * ]
- * ```
- *
- * Each string represents a vertical column on the board, and each character in the string represents a point.
- *
- * Traditional notation for Go is e.g. "B,1" referring to second ("B") column, first rank. This is the equivalent of
- * index (1 * N) + 0 , where N is the size of the board.
- *
- * Note that index 0 (the [0][0] point) is shown on the bottom-left on the visual board (as is traditional), and each
- * string represents a vertical column on the board. In other words, the printed example above can be understood to
- * be rotated 90 degrees clockwise compared to the board UI as shown in the IPvGO game.
- *
- */
-export function simpleBoardFromBoard(board: Board): SimpleBoard {
-  return board.map((column) =>
-    column.reduce((str, point) => {
-      if (!point) {
-        return str + "#";
+      for (let [h, n, q, m] of moves) {
+        if (!m) {
+          passq = q;
+          continue;
+        }
+        if (n && q > passq - 2) {
+          try {
+            lastMove = await ns.go.makeMove(...m);
+          } catch {
+            continue;
+          }
+          moved = true;
+          break;
+        }
       }
-      if (point.color === GoColor.black) {
-        return str + "X";
-      }
-      if (point.color === GoColor.white) {
-        return str + "O";
-      }
-      return str + ".";
-    }, ""),
-  );
-}
-
-/**
- * Returns a string representation of the given board.
- * The string representation is the same as simpleBoardFromBoard() but concatenated into a single string
- *
- * For example, a 5x5 board might look like this:
- * ```
- *   "XX.O.X..OO.XO..XXO...XOO."
- * ```
- */
-export function boardStringFromBoard(board: Board): string {
-  return simpleBoardFromBoard(board).join("");
-}
-
-/**
- * Returns a full board object from a string representation of the board.
- * The string representation is the same as simpleBoardFromBoard() but concatenated into a single string
- *
- * For example, a 5x5 board might look like this:
- * ```
- *   "XX.O.X..OO.XO..XXO...XOO."
- * ```
- */
-export function boardFromBoardString(boardString: string): Board {
-  const simpleBoardArray = simpleBoardFromBoardString(boardString);
-
-  return boardFromSimpleBoard(simpleBoardArray);
-}
-
-/**
- * Slices a string representation of a board into an array of strings representing the rows on the board
- */
-export function simpleBoardFromBoardString(boardString: string): SimpleBoard {
-  // Turn the SimpleBoard string into a string array, allowing access of each point via indexes e.g. [0][1]
-  const boardSize = Math.round(Math.sqrt(boardString.length));
-  const boardTiles = boardString.split("");
-
-  // Split the single board string into rows of length equal to the board width
-  const simpleBoardArray = Array(boardSize)
-    .fill("")
-    .map((_, index) => boardTiles.slice(index * boardSize, (index + 1) * boardSize).join(""));
-
-  return simpleBoardArray;
-}
-
-/** Creates a board object from a simple board. The resulting board has no analytics (liberties/chains) */
-export function boardFromSimpleBoard(simpleBoard: SimpleBoard): Board {
-  return simpleBoard.map((column, x) =>
-    column.split("").map((char, y) => {
-      if (char === "#") return null;
-      if (char === "X") return blankPointState(GoColor.black, x, y);
-      if (char === "O") return blankPointState(GoColor.white, x, y);
-      return blankPointState(GoColor.empty, x, y);
-    }),
-  );
-}
-
-/**
- * Creates a Board object from the given simpleBoard string array
- * Also updates the board object with the analytics (liberties/chains) from the simple board
- */
-export const updatedBoardFromSimpleBoard = (simpleBoard: SimpleBoard): Board => {
-  const board = boardFromSimpleBoard(simpleBoard);
-  updateChains(board);
-  return board;
-};
-
-export function boardStateFromSimpleBoard(
-  simpleBoard: SimpleBoard,
-  ai = GoOpponent.Daedalus,
-  lastPlayer = GoColor.black,
-): BoardState {
-  const newBoardState = getNewBoardState(simpleBoard[0].length, ai, false, boardFromSimpleBoard(simpleBoard));
-  newBoardState.previousPlayer = lastPlayer;
-  updateCaptures(newBoardState.board, lastPlayer);
-  return newBoardState;
-}
-
-export function blankPointState(color: GoColor, x: number, y: number): PointState {
-  return {
-    color: color,
-    y,
-    x,
-    chain: "",
-    liberties: null,
-  };
-}
-
-export function areSimpleBoardsIdentical(simpleBoard1: SimpleBoard, simpleBoard2: SimpleBoard) {
-  return simpleBoard1.every((column, x) => column === simpleBoard2[x]);
-}
-
-export function getColorOnBoardString(boardString: string, x: number, y: number): GoColor | null {
-  const boardSize = Math.round(Math.sqrt(boardString.length));
-  const char = boardString[x * boardSize + y];
-  if (char === "X") return GoColor.black;
-  if (char === "O") return GoColor.white;
-  if (char === ".") return GoColor.empty;
-  return null;
-}
-
-/** Find a move made by the previous player, if present. */
-export function getPreviousMove(): [number, number] | null {
-  const priorBoard = Go.currentGame.previousBoards[0];
-  if (Go.currentGame.passCount || !priorBoard) {
-    return null;
-  }
-
-  for (const [rowIndex, row] of Go.currentGame.board.entries()) {
-    for (const [pointIndex, point] of row.entries()) {
-      const priorColor = point && getColorOnBoardString(priorBoard, point.x, point.y);
-      const currentColor = point?.color;
-      const isPreviousPlayer = currentColor === Go.currentGame.previousPlayer;
-      const isChanged = priorColor !== currentColor;
-      if (priorColor && currentColor && isPreviousPlayer && isChanged) {
-        return [rowIndex, pointIndex];
+      if (!moved) {
+        lastMove = await ns.go.passTurn();
       }
     }
+    let { blackScore, whiteScore } = ns.go.getGameState();
+    if (blackScore > whiteScore) wins++;
+    ns.print(blackScore, ' - ', whiteScore)
+    ns.ui.setTailTitle(wins + ' wins of ' + (i + 1) + ' games')
+    await ns.asleep(0);
   }
-
-  return null;
-}
-
-/**
- * Gets the last move, if it was made by the specified color and is present
- */
-export function getPreviousMoveDetails(): Play {
-  const priorMove = getPreviousMove();
-  if (priorMove) {
-    return {
-      type: GoPlayType.move,
-      x: priorMove[0],
-      y: priorMove[1],
-    };
-  }
-
-  return {
-    type: Go.currentGame.previousPlayer ? GoPlayType.pass : GoPlayType.gameOver,
-    x: null,
-    y: null,
-  };
+  ns.print('Average game time was ', (Date.now() - start) / 100000, 'seconds');
 }
