@@ -49,26 +49,33 @@ function StatsProgressBarInner({ name, color }: InnerProps): React.ReactElement 
   const [progress, setProgress] = useState(calculateSkillProgress(0));
 
   const updateProgress = useCallback((newProgress: ISkillProgress) => {
-      const ele = domRef.current?.firstElementChild;
-      if (ele) {
-        const isWrapping =
-          newProgress.currentSkill === progress.currentSkill + 1 && newProgress.progress < progress.progress;
-        const sameLevel =
-          newProgress.currentSkill === progress.currentSkill && newProgress.progress > progress.progress;
-        const keyframes = [
-          { transform: `translateX(${progress.progress - 100}%)`, offset: 0 },
-          { transform: `translateX(${newProgress.progress - 100}%)`, offset: 1 },
-        ];
-        if (isWrapping) {
-          const offset = (100 - progress.progress) / (100 + newProgress.progress - progress.progress);
-          keyframes.splice(1, 0, { transform: "translateX(0%)", offset }, { transform: "translateX(-100%)", offset });
-        }
-        // Use an instant animation for large or backward jumps, which is the
-        // same as no animation at all.
-        ele.animate(keyframes, { fill: "forwards", duration: isWrapping || sameLevel ? 400 : 0 });
+    setProgress((progress) => {
+      if (progress.progress === newProgress.progress) {
+        // Nothing has changed, return the original object for no rerender.
+        return progress;
       }
-      setProgress(newProgress);
-  }, [progress]);
+      // This takes place in the state updater for progress.
+      const ele = domRef.current?.firstElementChild;
+      if (!ele) return newProgress;
+
+      const isWrapping =
+        newProgress.currentSkill === progress.currentSkill + 1 && newProgress.progress < progress.progress;
+      const sameLevel =
+        newProgress.currentSkill === progress.currentSkill && newProgress.progress > progress.progress;
+      const keyframes = [
+        { transform: `translateX(${progress.progress - 100}%)`, offset: 0 },
+        { transform: `translateX(${newProgress.progress - 100}%)`, offset: 1 },
+      ];
+      if (isWrapping) {
+        const offset = (100 - progress.progress) / (100 + newProgress.progress - progress.progress);
+        keyframes.splice(1, 0, { transform: "translateX(0%)", offset }, { transform: "translateX(-100%)", offset });
+      }
+      // Use an instant animation for large or backward jumps, which is the
+      // same as no animation at all.
+      ele.animate(keyframes, { fill: "forwards", duration: isWrapping || sameLevel ? 400 : 0 });
+      return newProgress;
+    });
+  }, []);
 
   useEffect(() => {
     const clearSubscription = OverviewEventEmitter.subscribe(() => {
