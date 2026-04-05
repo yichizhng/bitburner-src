@@ -46,33 +46,32 @@ function isSkill(name: string): name is keyof typeof skillNameMap {
 // rerendered on every refresh.
 function StatsProgressBarInner({ name, color }: InnerProps): React.ReactElement {
   const domRef: React.Ref<HTMLElement> = useRef(null);
-  const progress = useRef(calculateSkillProgress(0));
+  const [progress, setProgress] = useState(calculateSkillProgress(0));
   useEffect(() => {
     const clearSubscription = OverviewEventEmitter.subscribe(() => {
       const mult = skillMultUpdaters[name]();
       // Since this creates a new object every time, it normally causes a rerender every time.
       const newProgress = calculateSkillProgress(Player.exp[skillNameMap[name]], mult);
-        // This takes place in the state updater for progress.
+      // This takes place in the state updater for progress.
       const ele = domRef.current?.firstElementChild;
-      const pogress = progress.current;
       if (ele) {
         const isWrapping =
-          newProgress.currentSkill === pogress.currentSkill + 1 && newProgress.progress < pogress.progress;
+          newProgress.currentSkill === progress.currentSkill + 1 && newProgress.progress < progress.progress;
         const sameLevel =
-          newProgress.currentSkill === pogress.currentSkill && newProgress.progress > pogress.progress;
+          newProgress.currentSkill === progress.currentSkill && newProgress.progress > progress.progress;
         const keyframes = [
-          { transform: `translateX(${pogress.progress - 100}%)`, offset: 0 },
+          { transform: `translateX(${progress.progress - 100}%)`, offset: 0 },
           { transform: `translateX(${newProgress.progress - 100}%)`, offset: 1 },
         ];
         if (isWrapping) {
-          const offset = (100 - pogress.progress) / (100 + newProgress.progress - pogress.progress);
+          const offset = (100 - progress.progress) / (100 + newProgress.progress - progress.progress);
           keyframes.splice(1, 0, { transform: "translateX(0%)", offset }, { transform: "translateX(-100%)", offset });
         }
         // Use an instant animation for large or backward jumps, which is the
         // same as no animation at all.
         ele.animate(keyframes, { fill: "forwards", duration: isWrapping || sameLevel ? 400 : 0 });
       }
-      progress.current = newProgress;
+      setProgress(newProgress);
     });
 
     return clearSubscription;
