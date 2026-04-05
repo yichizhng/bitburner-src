@@ -4,7 +4,7 @@ import { TableRow, TableCell, Tooltip, Typography } from "@mui/material";
 import { OverviewEventEmitter, useStyles } from "./CharacterOverview";
 import { Player } from "@player";
 import { currentNodeMults } from "../../BitNode/BitNodeMultipliers";
-import { calculateSkillProgress } from "../../PersonObjects/formulas/skill";
+import { calculateSkillProgress, ISkillProgress } from "../../PersonObjects/formulas/skill";
 import { formatExp } from "../formatNumber";
 
 interface IProps {
