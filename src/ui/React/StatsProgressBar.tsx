@@ -47,12 +47,8 @@ function isSkill(name: string): name is keyof typeof skillNameMap {
 function StatsProgressBarInner({ name, color }: InnerProps): React.ReactElement {
   const domRef: React.Ref<HTMLElement> = useRef(null);
   const [progress, setProgress] = useState(calculateSkillProgress(0));
-  useEffect(() => {
-    const clearSubscription = OverviewEventEmitter.subscribe(() => {
-      const mult = skillMultUpdaters[name]();
-      // Since this creates a new object every time, it normally causes a rerender every time.
-      const newProgress = calculateSkillProgress(Player.exp[skillNameMap[name]], mult);
-      // This takes place in the state updater for progress.
+
+  const updateProgress = useCallback((newProgress) => {
       const ele = domRef.current?.firstElementChild;
       if (ele) {
         const isWrapping =
@@ -72,6 +68,14 @@ function StatsProgressBarInner({ name, color }: InnerProps): React.ReactElement 
         ele.animate(keyframes, { fill: "forwards", duration: isWrapping || sameLevel ? 400 : 0 });
       }
       setProgress(newProgress);
+  }, [progress]);
+
+  useEffect(() => {
+    const clearSubscription = OverviewEventEmitter.subscribe(() => {
+      const mult = skillMultUpdaters[name]();
+      // Since this creates a new object every time, it normally causes a rerender every time.
+      const newProgress = calculateSkillProgress(Player.exp[skillNameMap[name]], mult);
+      updateProgress(newProgress);
     });
 
     return clearSubscription;
