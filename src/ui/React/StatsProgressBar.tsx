@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useCallback, useMemo, useRef, useState } from "react";
 import LinearProgress from "@mui/material/LinearProgress";
 import { TableRow, TableCell, Tooltip, Typography } from "@mui/material";
 import { OverviewEventEmitter, useStyles } from "./CharacterOverview";
