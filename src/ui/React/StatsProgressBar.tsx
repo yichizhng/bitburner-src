@@ -48,7 +48,7 @@ function StatsProgressBarInner({ name, color }: InnerProps): React.ReactElement 
   const domRef: React.Ref<HTMLElement> = useRef(null);
   const [progress, setProgress] = useState(calculateSkillProgress(0));
 
-  const updateProgress = useCallback((newProgress) => {
+  const updateProgress = useCallback((newProgress: ISkillProgress) => {
       const ele = domRef.current?.firstElementChild;
       if (ele) {
         const isWrapping =
