@@ -52,15 +52,9 @@ function StatsProgressBarInner({ name, color }: InnerProps): React.ReactElement 
       const mult = skillMultUpdaters[name]();
       // Since this creates a new object every time, it normally causes a rerender every time.
       const newProgress = calculateSkillProgress(Player.exp[skillNameMap[name]], mult);
-      setProgress((progress) => {
-        if (progress.progress === newProgress.progress) {
-          // Nothing has changed, return the original object for no rerender.
-          return progress;
-        }
         // This takes place in the state updater for progress.
-        const ele = domRef.current?.firstElementChild;
-        if (!ele) return newProgress;
-
+      const ele = domRef.current?.firstElementChild;
+      if (ele) {
         const isWrapping =
           newProgress.currentSkill === progress.currentSkill + 1 && newProgress.progress < progress.progress;
         const sameLevel =
@@ -76,8 +70,7 @@ function StatsProgressBarInner({ name, color }: InnerProps): React.ReactElement 
         // Use an instant animation for large or backward jumps, which is the
         // same as no animation at all.
         ele.animate(keyframes, { fill: "forwards", duration: isWrapping || sameLevel ? 400 : 0 });
-        return newProgress;
-      });
+      }
     });
 
     return clearSubscription;
