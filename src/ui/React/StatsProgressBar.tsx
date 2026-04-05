@@ -86,7 +86,7 @@ function StatsProgressBarInner({ name, color }: InnerProps): React.ReactElement 
     });
 
     return clearSubscription;
-  }, [name]);
+  }, [name, updateProgress]);
 
   const tooltip = (
     <Typography sx={{ textAlign: "right" }}>
